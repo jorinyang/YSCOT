@@ -119,7 +119,7 @@ YSCOT 的判断是：**一堂课应该有一个统一的“房间”对象。** 
 ### 三步接入
 
 1. **取令牌**：登录后打开「工作台 → 个人信息 → MCP 接入令牌」，复制自己的 token；每个讲师一套，可随时重置。
-2. **配客户端**：URL 用 `https://yscot.clawshell.online/mcp`，请求头带 `Authorization: Bearer <MCP_TOKEN>`。
+2. **配客户端**：URL 用 `https://yscot.clawshell.online/mcp`，请求头带 `Authorization: Bearer <个人 token>`。
 3. **先验证**：调用 `tools/list`，看到 `tools` 数组再开始写入。
 
 通用 MCP HTTP 客户端配置：
@@ -130,7 +130,7 @@ YSCOT 的判断是：**一堂课应该有一个统一的“房间”对象。** 
     "yscot": {
       "type": "http",
       "url": "https://yscot.clawshell.online/mcp",
-      "headers": { "Authorization": "Bearer <MCP_TOKEN>" }
+      "headers": { "Authorization": "Bearer <个人 token>" }
     }
   }
 }
@@ -336,7 +336,7 @@ node server.mjs
 | `DINGTALK_CLIENT_ID` / `DINGTALK_CLIENT_SECRET` / `DINGTALK_CORP_ID` | 钉钉登录与部门同步 |
 | `PUBLIC_URL` | 公网地址，用于钉钉回调和分享链接 |
 | `REQUIRE_AUTH` | `1` 开启强制登录 |
-| `MCP_TOKEN` | MCP 访问令牌 |
+| `MCP_TOKEN` | 服务端兜底/管理员令牌；日常使用讲师个人页面 token |
 | `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE` / `DEEPSEEK_MODEL` | 模型兜底配置；页面配置优先 |
 
 ### Docker
