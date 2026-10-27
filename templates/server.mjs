@@ -758,7 +758,10 @@ const server=http.createServer(async (req,res)=>{
   if(p==='/embed') return send(res,200,fs.readFileSync(path.join(__dirname,'embed.html')),'text/html; charset=utf-8');
   if(p==='/mcp'){
     if(req.method!=='POST'){
-      if(req.method==='GET'){ res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); return res.end(mcpHelpHtml()); }
+      if(req.method==='GET'){
+        if(String(req.headers.accept||'').indexOf('text/event-stream')>=0) return send(res,405,{jsonrpc:'2.0',error:{code:-32600,message:'本端点不支持 GET SSE；请用 POST JSON-RPC'},id:null});
+        res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); return res.end(mcpHelpHtml());
+      }
       return send(res,405,{jsonrpc:'2.0',error:{code:-32600,message:'MCP 只接受 POST JSON-RPC'},id:null});
     }
     const auth=String(req.headers.authorization||'');
