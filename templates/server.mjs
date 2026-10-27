@@ -526,7 +526,7 @@ function screenView(){
     students:Object.keys(state.students||{}).length
   };
 }
-function send(res,code,obj,type='application/json; charset=utf-8'){ const body=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); res.writeHead(code,{'Content-Type':type,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}); res.end(body); }
+function send(res,code,obj,type='application/json; charset=utf-8'){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); res.writeHead(code,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}); res.end(body); }
 function readRaw(req, limit){
   return new Promise((resolve,reject)=>{ const chunks=[]; let n=0; const max=limit||8*1024*1024;
     req.on('data',c=>{ n+=c.length; if(n>max){ reject(new Error('too large')); req.destroy(); return; } chunks.push(c); });
