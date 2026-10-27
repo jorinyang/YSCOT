@@ -319,7 +319,7 @@ curl -s https://yscot.clawshell.online/mcp \
   </main></body></html>`;
 }
 
-async function mcpHandle(msg){
+async function mcpHandle(msg, mcpTeacher){
   const id=(msg&&msg.id!==undefined)?msg.id:null;
   const method=msg&&msg.method;
   const reply=function(result){ return {jsonrpc:'2.0',id,result}; };
