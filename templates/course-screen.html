@@ -57,7 +57,6 @@ body{background:var(--bg);color:var(--text);font-family:Inter,"PingFang SC","Mic
   <div class="pptx-wrap" id="pptxWrap"><div class="pptx-msg" id="pptxMsg"></div><div class="pptx-holder" id="pptxHolder"></div></div>
   <div class="empty" id="empty"><b>还没有课件</b><span>在课堂后台「课程内容」上传 PPTX 或 HTML 后，这里会自动出现。</span></div>
 </div>
-<script src="/assets/pptx-preview.umd.js"></script>
 <script>
 var q=new URLSearchParams(location.search), ROOM=(q.get('room')||'ROOM0').toUpperCase();
 var files=[], current=-1, groups=[], screenData=null, pptxArea=null, slideIndex=0, slideCount=0;
@@ -112,24 +111,37 @@ function showFile(i){
   $('slideNav').classList.remove('show');
 }
 function pptxMsg(t){var m=$('pptxMsg'); if(m){m.textContent=t||''; m.classList.toggle('show',!!t)}}
+function ensurePptxPreview(){
+  if(window.pptxPreview&&window.pptxPreview.init) return Promise.resolve(window.pptxPreview);
+  if(window.__pptxLoading) return window.__pptxLoading;
+  window.__pptxLoading=new Promise(function(resolve,reject){
+    var s=document.createElement('script'); s.src='/assets/pptx-preview.umd.js';
+    s.onload=function(){ window.pptxPreview?resolve(window.pptxPreview):reject(new Error('预览组件没有初始化')) };
+    s.onerror=function(){ reject(new Error('预览组件下载失败')) };
+    document.head.appendChild(s);
+  });
+  return window.__pptxLoading;
+}
 function renderPptx(url){
   var holder=$('pptxHolder'); if(!holder)return;
-  holder.innerHTML=''; pptxMsg('正在渲染 PPTX…');
-  var stage=$('stage'); var w=Math.max(320,Math.min(stage.clientWidth-40,1400)); var h=Math.round(w*9/16);
-  if(!window.pptxPreview||!window.pptxPreview.init){pptxMsg('PPTX 预览组件加载失败');return}
-  try{
-    pptxArea=window.pptxPreview.init(holder,{width:w,height:h,mode:'slide'});
-    fetch(url,{cache:'no-store'}).then(function(r){return r.arrayBuffer()}).then(function(buf){
-      var ret=pptxArea.preview(buf);
-      var done=function(){
-        slideCount=Number(pptxArea.slideCount)||0;
-        if(!slideCount){pptxMsg('PPTX 解析失败：没有读到幻灯片，请换用 PowerPoint 标准导出的 PPTX');return}
-        slideIndex=0; renderPageTabs(); pptxMsg('');
-      };
-      if(ret&&ret.then){ret.then(done).catch(function(e){pptxMsg('PPTX 渲染失败：'+esc(e.message||e))})}
-      else{setTimeout(done,800)}
-    }).catch(function(e){pptxMsg('PPTX 读取失败：'+esc(e.message||e))});
-  }catch(e){ pptxMsg('PPTX 渲染失败：'+esc(e.message||e)); }
+  holder.innerHTML=''; pptxMsg('正在加载 PPTX 预览组件…');
+  ensurePptxPreview().then(function(){
+    pptxMsg('正在渲染 PPTX…');
+    var stage=$('stage'); var w=Math.max(320,Math.min(stage.clientWidth-40,1400)); var h=Math.round(w*9/16);
+    try{
+      pptxArea=window.pptxPreview.init(holder,{width:w,height:h,mode:'slide'});
+      fetch(url,{cache:'no-store'}).then(function(r){return r.arrayBuffer()}).then(function(buf){
+        var ret=pptxArea.preview(buf);
+        var done=function(){
+          slideCount=Number(pptxArea.slideCount)||0;
+          if(!slideCount){pptxMsg('PPTX 解析失败：没有读到幻灯片，请换用 PowerPoint 标准导出的 PPTX');return}
+          slideIndex=0; renderPageTabs(); pptxMsg('');
+        };
+        if(ret&&ret.then){ret.then(done).catch(function(e){pptxMsg('PPTX 渲染失败：'+esc(e.message||e))})}
+        else{setTimeout(done,800)}
+      }).catch(function(e){pptxMsg('PPTX 读取失败：'+esc(e.message||e))});
+    }catch(e){ pptxMsg('PPTX 渲染失败：'+esc(e.message||e)); }
+  }).catch(function(e){ pptxMsg('PPTX 加载失败：'+esc(e.message||e)); });
 }
 function refresh(){
   fetch('/api/screen?room='+ROOM,{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
