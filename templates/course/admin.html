@@ -209,6 +209,7 @@ async function post(p,body){return api(p,{method:'POST',headers:{'Content-Type':
 var state=null,editingKey=null;
 var _rm=(document.cookie.match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/)||[])[1];
 var ROOM=(new URLSearchParams(location.search).get('room')||_rm||'ROOM0').toUpperCase();
+(function(){var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0&&u.indexOf('room=')<0)u+=(u.indexOf('?')>=0?'&':'?')+'room='+encodeURIComponent(ROOM);return f(u,o)}})();
 var rp=document.getElementById('roomPill'); if(rp)rp.textContent='房间 '+ROOM;
 var lk=function(id,path){var el=document.getElementById(id); if(el)el.href=path+'?room='+ROOM};
 lk('lnkScreen','/screen'); lk('lnkRemote','/remote'); lk('lnkJoin','/join');

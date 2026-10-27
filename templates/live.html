@@ -152,6 +152,8 @@ body{animation:pageIn .32s ease both}
 <script src="/dialog.js"></script>
 <script>
 var API=(window.YSCOT_API||'');
+var ROOM=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
+(function(){var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0&&ROOM&&u.indexOf('room=')<0)u+=(u.indexOf('?')>=0?'&':'?')+'room='+encodeURIComponent(ROOM);return f(u,o)}})();
 var MAT='/materials/';
 var KEY='camp_live_v3';
 var me={name:'',tail:''};
