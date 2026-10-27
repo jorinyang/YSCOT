@@ -115,7 +115,7 @@ function ensurePptxPreview(){
   if(window.pptxPreview&&window.pptxPreview.init) return Promise.resolve(window.pptxPreview);
   if(window.__pptxLoading) return window.__pptxLoading;
   window.__pptxLoading=new Promise(function(resolve,reject){
-    var s=document.createElement('script'); s.src='/assets/pptx-preview.umd.js';
+    var s=document.createElement('script'); s.src='/assets/pptx-preview.umd.js?v=20261027';
     s.onload=function(){ window.pptxPreview?resolve(window.pptxPreview):reject(new Error('预览组件没有初始化')) };
     s.onerror=function(){ reject(new Error('预览组件下载失败')) };
     document.head.appendChild(s);
