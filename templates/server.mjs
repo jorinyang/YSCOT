@@ -64,7 +64,7 @@ function listRooms(teacher){
     let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(code),'utf8')); }catch(e){}
     const st=loadRoom(code);
     const _t=teacher||{}; if(_t.role!=='admin'){ if(code===DEFAULT_ROOM||!meta.owner||meta.owner!==_t.id) return; }
-    out.push({code,title:meta.title||('课堂 '+code),city:meta.city||'',date:meta.date||'',owner:meta.owner||'',province:meta.province||'',project:meta.project||'',files:meta.files||[],frameworkUrl:meta.frameworkUrl||'',createdAt:meta.createdAt||'',students:Object.keys(st.students||{}).length,active:!!(st.poll&&st.poll.active)||!!(st.quiz&&st.quiz.paper&&st.quiz.paper.active)});
+    out.push({code,title:meta.title||('课堂 '+code),city:meta.city||'',date:meta.date||'',owner:meta.owner||'',province:meta.province||'',project:meta.project||'',files:(meta.files||[]).map(function(f){return Object.assign({},f,{url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(code)})}),frameworkUrl:meta.frameworkUrl||'',createdAt:meta.createdAt||'',students:Object.keys(st.students||{}).length,active:!!(st.poll&&st.poll.active)||!!(st.quiz&&st.quiz.paper&&st.quiz.paper.active)});
   };
   one(DEFAULT_ROOM);
   if(fs.existsSync(ROOMS_DIR)) fs.readdirSync(ROOMS_DIR).forEach(function(d){ if(validRoom(d)&&d!==DEFAULT_ROOM) one(d); });
@@ -172,7 +172,7 @@ function studentView(k){
     roll:(function(){var r=state.roll||{};return {active:!!r.active,name:r.name||'',selected:!!(r.active&&r.key===k)};})(),
     card:(function(){ if(!(state.config&&state.config.workshopOpen)) return null; var c=(state.cards||[]).filter(function(x){return x.id===state.config.activeCard})[0]; return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null; })(),
     materialOpen:!!(state.config&&state.config.materialOpen),
-    materials:(function(){var out=[];try{var m=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8'));out=(m.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
+    materials:(function(){var out=[];try{var m=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8'));out=(m.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',round:(state.buzz&&state.buzz.round)||0},
@@ -322,7 +322,7 @@ async function mcpHandle(msg){
           let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(room),'utf8')); }catch(e){}
           meta.files=meta.files||[]; meta.files.push({name:nm,stored:stored,size:buf.length,type:String(a.type||raw.split('.').pop()||''),at:new Date().toISOString()});
           fs.writeFileSync(roomMetaFile(room),JSON.stringify(meta,null,1));
-          return reply({content:[{type:'text',text:JSON.stringify({ok:true,name:nm,stored:stored,url:'/api/room/file?name='+encodeURIComponent(stored),size:buf.length})}]});
+          return reply({content:[{type:'text',text:JSON.stringify({ok:true,name:nm,stored:stored,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom),size:buf.length})}]});
         }
         if(a.url){
           const uu=String(a.url); if(!/^https?:\/\//i.test(uu)) return reply({isError:true,content:[{type:'text',text:'url 必须是 http(s)'}]});
@@ -587,7 +587,7 @@ function screenView(){
   const quiz=state.quiz||{};
   const paper=quiz.paper;
   let _meta={}; try{ _meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
-  return {ok:true,room:currentRoom,title:_meta.title||('课堂 '+currentRoom),at:Date.now(),screenView:(state.config&&state.config.screenView)||'stats',slide:(state.config&&state.config.slide)||0,packageId:_meta.packageId||'',materialOpen:!!(state.config&&state.config.materialOpen),hwOpen:!!(state.config&&state.config.hwOpen),groups:Object.keys(state.groups||{}).map(function(g){return {id:g,name:state.groups[g].name,perf:state.groups[g].perf||0}}),activeCard:(state.config&&state.config.activeCard)||'',files:(_meta.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)}}),workshopOpen:!!(state.config&&state.config.workshopOpen),timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
+  return {ok:true,room:currentRoom,title:_meta.title||('课堂 '+currentRoom),at:Date.now(),screenView:(state.config&&state.config.screenView)||'stats',slide:(state.config&&state.config.slide)||0,packageId:_meta.packageId||'',materialOpen:!!(state.config&&state.config.materialOpen),hwOpen:!!(state.config&&state.config.hwOpen),groups:Object.keys(state.groups||{}).map(function(g){return {id:g,name:state.groups[g].name,perf:state.groups[g].perf||0}}),activeCard:(state.config&&state.config.activeCard)||'',files:(_meta.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}}),workshopOpen:!!(state.config&&state.config.workshopOpen),timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     poll:{active:!!poll.active,question:poll.question||'',options:poll.options||[],results,count:Object.keys(poll.votes||{}).length},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',round:(state.buzz&&state.buzz.round)||0},
     quiz:paper?{active:!!paper.active,count:paper.questions.length,points:paper.questions.reduce((a,b)=>a+(b.score||0),0),answered:Object.keys(quiz.answers||{}).length,avg:(function(){const v=Object.values(quiz.answers||{});return v.length?Math.round(v.reduce((a,b)=>a+(b.score||0),0)/v.length*10)/10:0})()}:null,
@@ -772,7 +772,7 @@ const server=http.createServer(async (req,res)=>{
       let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
       meta.files=meta.files||[]; meta.files.push({name:raw,stored,size:buf.length,type:ext,at:new Date().toISOString()});
       fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
-      return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)});
+      return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom)});
     }catch(e){ return send(res,400,{ok:false,error:String(e.message||e)}); }
   }
   if(p==='/api/room/deletefile' && req.method==='POST'){
