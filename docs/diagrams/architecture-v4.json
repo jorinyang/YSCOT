@@ -1,0 +1,664 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "YSCOT 功能全景",
+    "locale": "zh-CN",
+    "output": "yscot-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:jorinyang/YSCOT.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "4c561e383e7831819729935bb886f7f9c8f4e390"
+    }
+  },
+  "components": [
+    {
+      "id": "student",
+      "type": "external",
+      "label": "学员手机",
+      "sublabel": "浏览器 / 扫码进入",
+      "tag": "无需注册",
+      "icon": "person",
+      "pos": [
+        270,
+        40
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "templates/live.html",
+          "line": 102
+        }
+      ]
+    },
+    {
+      "id": "staff",
+      "type": "external",
+      "label": "讲师 / 助教 / 管理员",
+      "sublabel": "钉钉 OAuth · 本地口令",
+      "tag": "admin / teacher / assistant",
+      "icon": "person",
+      "pos": [
+        730,
+        40
+      ],
+      "size": [
+        260,
+        64
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 35
+        },
+        {
+          "path": "templates/login.html",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "id": "room",
+      "type": "frontend",
+      "label": "场次入口 /room",
+      "sublabel": "四端链接 · 学员二维码",
+      "tag": "入口页",
+      "pos": [
+        40,
+        210
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/room.html",
+          "line": 51
+        }
+      ]
+    },
+    {
+      "id": "join",
+      "type": "frontend",
+      "label": "学员端 /join",
+      "sublabel": "抽签 · 投票 · 答题 · 素材",
+      "tag": "手机",
+      "pos": [
+        270,
+        210
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/live.html",
+          "line": 109
+        },
+        {
+          "path": "templates/live.html",
+          "line": 121
+        }
+      ]
+    },
+    {
+      "id": "remote",
+      "type": "frontend",
+      "label": "遥控器 /remote",
+      "sublabel": "开关 · 积分 · 点名 · 投票",
+      "tag": "手机",
+      "pos": [
+        500,
+        210
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/remote.html",
+          "line": 39
+        },
+        {
+          "path": "templates/remote.html",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "id": "ops",
+      "type": "frontend",
+      "label": "课堂后台 /ops",
+      "sublabel": "课堂管理 · 作业评分 · 答题",
+      "tag": "桌面",
+      "pos": [
+        730,
+        210
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/course/admin.html",
+          "line": 58
+        },
+        {
+          "path": "templates/course/admin.html",
+          "line": 63
+        }
+      ]
+    },
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "授课大屏 /screen",
+      "sublabel": "课件 · 报告 · 工作坊",
+      "tag": "/course-screen",
+      "pos": [
+        960,
+        210
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/screen.html",
+          "line": 41
+        },
+        {
+          "path": "templates/course-screen.html",
+          "line": 132
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "setup",
+      "type": "frontend",
+      "label": "课程内容 /room-setup",
+      "sublabel": "PPTX 逐页 · HTML 页 · 场次",
+      "tag": "内容导入",
+      "pos": [
+        1190,
+        210
+      ],
+      "size": [
+        230,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/room-setup.html",
+          "line": 63
+        },
+        {
+          "path": "templates/room-setup.html",
+          "line": 70
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "report",
+      "type": "frontend",
+      "label": "课堂报告 /report",
+      "sublabel": "学员 · 小组 · 答题 · 作业",
+      "tag": "复盘",
+      "pos": [
+        1428,
+        210
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/report.html",
+          "line": 30
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "登录与角色",
+      "sublabel": "钉钉 OAuth · 签名 Cookie",
+      "tag": "安全边界",
+      "pos": [
+        80,
+        430
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 35
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 697
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "REST API",
+      "sublabel": "Node 20 · 房间路由",
+      "tag": "所有页面共用",
+      "pos": [
+        650,
+        430
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 645
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 1032
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP 端点 /mcp",
+      "sublabel": "14 工具 · 个人 Token",
+      "tag": "AI Agent 接入",
+      "pos": [
+        1020,
+        430
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 234
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 322
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "roomstate",
+      "type": "database",
+      "label": "房间状态 JSON",
+      "sublabel": "投票 · 分组 · 答题 · 作业",
+      "tag": "state.json",
+      "pos": [
+        520,
+        610
+      ],
+      "size": [
+        220,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 92
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "files",
+      "type": "database",
+      "label": "课程文件",
+      "sublabel": "PPTX / HTML / 素材",
+      "tag": "uploads",
+      "pos": [
+        820,
+        610
+      ],
+      "size": [
+        200,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 809
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "tokens",
+      "type": "database",
+      "label": "个人 MCP 令牌",
+      "sublabel": "每人一套 · 可复制/重置",
+      "tag": "mcp-tokens.json",
+      "pos": [
+        1100,
+        610
+      ],
+      "size": [
+        220,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 53
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 72
+        }
+      ],
+      "icon": "none"
+    },
+    {
+      "id": "dingtalk",
+      "type": "external",
+      "label": "钉钉开放平台",
+      "sublabel": "OAuth · 通讯录",
+      "tag": "外部",
+      "icon": "none",
+      "pos": [
+        80,
+        780
+      ],
+      "size": [
+        220,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 697
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "type": "external",
+      "label": "模型 API",
+      "sublabel": "课程生成 · 作业/主观题评分",
+      "tag": "可选",
+      "icon": "none",
+      "pos": [
+        520,
+        780
+      ],
+      "size": [
+        220,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 896
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "external",
+      "label": "AI Agent / MCP 客户端",
+      "sublabel": "Bearer 个人 Token · 写入内容",
+      "tag": "外部",
+      "icon": "none",
+      "pos": [
+        1020,
+        780
+      ],
+      "size": [
+        240,
+        76
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 322
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "浏览器端 · 课堂现场（同一房间）",
+      "wraps": [
+        "room",
+        "join",
+        "remote",
+        "ops",
+        "screen",
+        "setup",
+        "report"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "Node 20 单进程服务",
+      "wraps": [
+        "auth",
+        "api",
+        "mcp"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "房间数据 · 文件系统",
+      "wraps": [
+        "roomstate",
+        "files",
+        "tokens"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "外部能力",
+      "wraps": [
+        "dingtalk",
+        "model",
+        "agent"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "student-join",
+      "from": "student",
+      "to": "join",
+      "label": "扫码进入",
+      "variant": "emphasis"
+    },
+    {
+      "id": "staff-ops",
+      "from": "staff",
+      "to": "ops",
+      "label": "后台配置 / 评分",
+      "variant": "emphasis"
+    },
+    {
+      "id": "staff-remote",
+      "from": "staff",
+      "to": "remote",
+      "label": "现场遥控"
+    },
+    {
+      "id": "staff-setup",
+      "from": "staff",
+      "to": "setup",
+      "label": "课前放内容"
+    },
+    {
+      "id": "room-join",
+      "from": "room",
+      "to": "join",
+      "label": "QR"
+    },
+    {
+      "id": "join-api",
+      "from": "join",
+      "to": "api",
+      "label": "REST"
+    },
+    {
+      "id": "remote-api",
+      "from": "remote",
+      "to": "api"
+    },
+    {
+      "id": "ops-api",
+      "from": "ops",
+      "to": "api"
+    },
+    {
+      "id": "screen-api",
+      "from": "screen",
+      "to": "api"
+    },
+    {
+      "id": "setup-api",
+      "from": "setup",
+      "to": "api"
+    },
+    {
+      "id": "report-api",
+      "from": "report",
+      "to": "api"
+    },
+    {
+      "id": "api-roomstate",
+      "from": "api",
+      "to": "roomstate",
+      "label": "读写状态",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-files",
+      "from": "api",
+      "to": "files",
+      "label": "上传 / 读取"
+    },
+    {
+      "id": "api-auth",
+      "from": "api",
+      "to": "auth",
+      "label": "校验登录"
+    },
+    {
+      "id": "api-mcp",
+      "from": "api",
+      "to": "mcp",
+      "label": "共用房间"
+    },
+    {
+      "id": "api-tokens",
+      "from": "api",
+      "to": "tokens",
+      "label": "个人页查看 / 重置",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-model",
+      "from": "api",
+      "to": "model",
+      "label": "生成 / 评分（可选）",
+      "variant": "dashed"
+    },
+    {
+      "id": "mcp-roomstate",
+      "from": "mcp",
+      "to": "roomstate",
+      "label": "按 Token 写房间",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mcp-tokens",
+      "from": "mcp",
+      "to": "tokens",
+      "label": "校验 / 重置"
+    },
+    {
+      "id": "agent-mcp",
+      "from": "agent",
+      "to": "mcp",
+      "label": "JSON-RPC + Bearer",
+      "variant": "emphasis"
+    },
+    {
+      "id": "auth-dingtalk",
+      "from": "auth",
+      "to": "dingtalk",
+      "label": "OAuth"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "课堂现场",
+      "items": [
+        "遥控器：素材/作业开关、大屏切换、积分、点名、投票、抢答、答题、计时、卡片",
+        "课堂管理：投票题库、抽签分组、作业配置、点名结果、工作坊、素材、行动卡、学员管理",
+        "场次入口：四端链接 + 学员二维码"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "内容与作业",
+      "items": [
+        "课程内容：PPTX 逐页、HTML 课程页、场次信息",
+        "作业：六关提交、评分标准、评分 / CSV",
+        "投票题库与在线答题题库分开，互不自动混用"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "MCP 与数据",
+      "items": [
+        "MCP 14 个工具：房间、投票、答题、素材、卡片、题库、评分、报告",
+        "每个讲师一个个人 Token，可查看、复制、重置；按场次归属校验",
+        "房间状态与课程文件按场次号隔离"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "边界与运行",
+      "items": [
+        "浏览器端：四端共享同一房间",
+        "服务端：Node 20 单进程、零依赖、REST + MCP",
+        "外部：钉钉 OAuth、模型 API、AI Agent"
+      ]
+    }
+  ]
+}

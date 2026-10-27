@@ -355,15 +355,18 @@ docker run -d -p 8899:8899 \
 
 ## 架构
 
-<img src="docs/images/architecture-v3.svg" alt="YSCOT 全景架构：场次入口、四端、课程内容、大屏课件、Node 服务、房间状态、素材、MCP 与模型 API" width="100%" />
+<img src="docs/images/architecture-v4.png" alt="YSCOT 功能全景（archify 生成）：角色、场次入口、四端、课程内容、报告、Node 服务、房间数据、MCP 个人令牌与外部能力" width="100%" />
 
-**这张图想说明三件事：**
+**这张图想说明四件事：**
 
-1. **浏览器只负责界面**：场次入口、遥控器、后台、大屏、学员手机都通过 REST / SSE 读写同一份课堂状态；
-2. **Node 单进程是课堂的调度中心**：零依赖 HTTP 服务同时提供页面、API、SSE 和 MCP；
-3. **内容和外部能力在两侧**：房间 JSON + 课件 / 素材是本地持久化；MCP 和模型 API 是可选的外部写入 / 评分能力。
+1. **角色与入口**：学员扫码、讲师 / 助教 / 管理员从场次入口进入同一房间；
+2. **课堂四端 + 内容 / 报告**：学员端、遥控器、后台、大屏、课程内容和报告，共用同一份房间状态；
+3. **Node 单进程是调度中心**：REST API 负责页面、读写和报告，MCP 端点给 AI Agent 用；每个讲师有自己的 MCP token，按场次归属校验；
+4. **本地持久化与外部能力**：房间 JSON、课程文件、个人令牌落在房间数据目录；钉钉、模型 API 和 AI Agent 是外部能力。
 
-> 这张全景图补全了三个容易漏掉的视角：场次入口 `/room`、课程内容 `/room-setup`、课件大屏 `/course-screen`。要查某个按钮属于哪个端，也看这张。
+> 这版用 archify 重新生成，以原架构图的全景结构为底稿，补全了场次入口 /room、课程内容 /room-setup、大屏课件 /course-screen、报告 /report、作业评分、投票/答题分离和讲师个人 MCP token。
+>
+> 交互版：[打开可缩放架构图](https://yscot.clawshell.online/architecture) · [候选 JSON](docs/diagrams/architecture-v4.json)
 
 ### 设计取舍
 
