@@ -332,6 +332,9 @@ curl -s https://yscot.clawshell.online/mcp \
   <tr><td><code>card.put</code></td><td>行动卡 / 场景卡</td><td><code>room, theme, type, content, attrs</code></td></tr>
   <tr><td><code>rubric.put</code></td><td>作业评分标准</td><td><code>room, task(T1-T6), items[{t,pts,desc}]</code></td></tr>
   <tr><td><code>quiz.publish</code></td><td>按已有答题题库发布</td><td><code>room, mode(random/seq), counts, scores</code></td></tr>
+  
+  <tr><td><code>remote.state</code></td><td>读取遥控器状态</td><td><code>room</code>；返回投票、答题、计时、分组、卡片</td></tr>
+  <tr><td><code>remote.control</code></td><td>执行遥控器动作</td><td><code>room, action</code>；如 <code>screen.set</code>、<code>material.toggle</code>、<code>roll.start</code>、<code>poll.start</code>、<code>timer.start</code></td></tr>
   </table>
   <h2>5. 常见错误</h2>
   <table><tr><th>现象</th><th>处理</th></tr>
