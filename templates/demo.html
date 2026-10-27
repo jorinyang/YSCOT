@@ -1,0 +1,17 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YSCOT · 93 秒完整演示</title><style>
+:root{--bg:#0e0e10;--card:#17171b;--line:#2b2b32;--text:#f4efe2;--muted:#9db3a6;--lime:#cbf74e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.7 -apple-system,"Microsoft YaHei",sans-serif}
+main{max-width:1120px;margin:0 auto;padding:34px 22px 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.brand{font-weight:800;letter-spacing:.04em;color:var(--lime)}.links a{color:var(--text);opacity:.78;text-decoration:none;margin-left:14px;font-size:13px}.links a:hover{color:var(--lime);opacity:1}
+h1{font-size:30px;line-height:1.25;margin:12px 0 6px}p{color:#d8d2c5;margin:0 0 16px}.muted{color:var(--muted);font-size:13px}
+.player{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#000;box-shadow:0 26px 70px rgba(0,0,0,.5)}video{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#000}
+.badge{display:inline-block;border:1px solid rgba(203,247,78,.35);background:rgba(203,247,78,.08);color:var(--lime);border-radius:99px;padding:4px 10px;font-size:12px;margin-bottom:10px}
+.note{display:flex;gap:10px;align-items:flex-start;margin-top:14px;color:var(--muted);font-size:12.5px}.note b{color:var(--text);font-weight:600}
+</style></head><body><main>
+<div class="top"><div class="brand">YSCOT · 课堂运营系统</div><div class="links"><a href="https://yscot.clawshell.online">打开系统</a><a href="https://github.com/jorinyang/YSCOT">GitHub</a></div></div>
+<h1>一节课，从开场跑到复盘</h1><p>场次、课程内容、课堂后台、遥控器、大屏、学员端和 MCP 接入，按真实操作顺序跑一遍。</p>
+<div class="badge">93 秒完整版 · 1280 × 720</div>
+<div class="player"><video src="/assets/demo.mp4" poster="/assets/demo-poster.jpg" controls autoplay muted loop playsinline preload="metadata"></video></div>
+<div class="note"><b>为什么不是 README 里直接播放？</b><span>GitHub README 会过滤 HTML 的 video 标签，MP4 不能真正内嵌；这里用播放页承载完整视频，README 里放 GIF 预览并链接到本页。</span></div>
+<p class="muted" style="margin-top:18px">演示数据为本地演示场次，不含客户真实数据。</p>
+</main></body></html>

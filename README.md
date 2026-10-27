@@ -32,13 +32,14 @@ YSCOT 是一个面向企业 AI 培训现场的 **课堂运营系统**。它不�
 ## 演示：一节课怎么跑
 
 <p align="center">
-  <a href="docs/images/demo.mp4"><img src="docs/images/demo.gif" width="86%" alt="YSCOT 动效演示：场次入口、课程内容、后台、遥控器、大屏和学员端" /></a>
+  <a href="https://yscot.clawshell.online/demo"><img src="docs/images/demo-90.gif" width="86%" alt="YSCOT 93 秒动效演示：场次入口、课程内容、后台、遥控器、大屏、学员端和 MCP" /></a>
 </p>
 
-<p align="center"><sub>8 秒预览 · 42 秒完整演示　·　点击动图打开 MP4</sub></p>
+<p align="center"><sub>8 秒预览 · 93 秒完整演示　·　点击打开播放页　·　也可 [直接看 MP4](docs/images/demo-90.mp4)</sub></p>
 
-演示不是截图轮播：鼠标移动、点击、Tab 切换、小组加分、随机点名、PPTX / HTML 翻页、工作坊倒计时和学员抽签都是真实交互录屏，再叠加章节卡和说明字幕。
+> GitHub README 会过滤 `<video>` 标签，MP4 不能真正内嵌；完整视频放在播放页，README 用 GIF 做预览。
 
+演示不是截图轮播：鼠标移动、点击、Tab 切换、小组加分、随机点名、PPTX / HTML 翻页、工作坊倒计时、学员抽签、投票答题和 MCP 接入页都是真实交互录屏，再叠加章节卡和说明字幕。
 ---
 
 ## 为什么做这个
