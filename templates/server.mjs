@@ -219,6 +219,29 @@ function studentView(k){
     submissions: s? Object.keys(state.submissions).filter(k2=>k2.indexOf(k+'||')===0).map(k2=>{const p=k2.split('||');return {task:p[1],at:state.submissions[k2].at,total:(state.submissions[k2].score||{}).total||0,files:(state.submissions[k2].files||[]).length}}):[]
   };
 }
+
+function remoteView(){
+  const cfg=state.config||{}, poll=state.poll||{}, buzz=state.buzz||{}, quiz=state.quiz||{};
+  let roomTitle=''; try{ roomTitle=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')).title||''; }catch(e){}
+  const paper=quiz.paper||{}, timer=state.timer||{}, roll=state.roll||{};
+  const groups=Object.keys(state.groups||{}).map(function(g){return {id:g,name:(state.groups[g]&&state.groups[g].name)||g,perf:Number((state.groups[g]&&state.groups[g].perf)||0)}});
+  const cards=(state.cards||[]).map(function(c){return {id:c.id,theme:c.theme,type:c.type}});
+  const active=(state.cards||[]).filter(function(c){return c.id===cfg.activeCard})[0]||null;
+  return {
+    ok:true,room:currentRoom,title:roomTitle,materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,
+    screenView:cfg.screenView||'data',workshopOpen:!!cfg.workshopOpen,
+    groups:groups,
+    roll:{active:!!roll.active,name:roll.name||'',round:roll.round||0},
+    poll:{active:!!poll.active,question:poll.question||'',options:poll.options||[],count:Object.keys(poll.votes||{}).length,results:poll.results||{},startedAt:poll.startedAt||''},
+    buzz:{enabled:!!buzz.enabled,running:!!buzz.running,winner:buzz.winner||'',round:buzz.round||0},
+    quiz:{active:!!paper.active,mode:paper.mode||(quiz.config&&quiz.config.mode)||'',count:paper.count||((paper.questions||[]).length),answered:Object.keys(quiz.answers||{}).length,bank:{choice:((quiz.bank||{}).choice||[]).length,judge:((quiz.bank||{}).judge||[]).length,blank:((quiz.bank||{}).blank||[]).length,short:((quiz.bank||{}).short||[]).length}},
+    timer:{running:!!timer.running,endAt:timer.endAt||0,left:timer.running?Math.max(0,(timer.endAt||0)-Date.now()):0,workshopOpen:!!cfg.workshopOpen},
+    activeCard:active?{id:active.id,theme:active.theme,type:active.type,content:active.content}:null,
+    cards:cards,
+    presets:(state.votePresets||[]).map(function(v){return {id:v.id,question:v.question,options:v.options}})
+  };
+}
+
 function adminView(){
   const counts=groupCounts();
   const qz=state.quiz||{bank:{},config:{},paper:null,answers:{}};
@@ -247,7 +270,9 @@ function mcpToolDefs(){
     {name:'card.put',description:'导入行动卡或场景卡；带 id 为更新，不带为新增。',inputSchema:{type:'object',properties:{room:{type:'string'},id:{type:'string'},theme:{type:'string'},type:{type:'string'},content:{type:'string'},attrs:{type:'string'}},required:['room','theme']}},
     {name:'votebank.put',description:'导入投票题库；mode=append/replace，presets 为 {question,options[]} 数组。',inputSchema:{type:'object',properties:{room:{type:'string'},mode:{type:'string',enum:['append','replace']},presets:{type:'array',items:{type:'object',properties:{question:{type:'string'},options:{type:'array',items:{type:'string'}}},required:['question','options']}},question:{type:'string'},options:{type:'array',items:{type:'string'}}},required:['room']}},
     {name:'rubric.put',description:'导入作业评分标准；items 为 {t,pts,desc}，按 task 保存。',inputSchema:{type:'object',properties:{room:{type:'string'},task:{type:'string'},items:{type:'array',items:{type:'object',properties:{t:{type:'string'},pts:{type:'number'},desc:{type:'string'}},required:['t','pts']}}},required:['room','task','items']}}
-
+,
+    {name:'remote.state',description:'读取遥控器状态：投票、抢答、答题、计时、分组、卡片、素材/作业开关。语音控制前先查状态。',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
+    {name:'remote.control',description:'执行遥控器操作，适合语音/Agent：material.open/close/toggle、hw.open/close/toggle、screen.set、group.score、roll.start/stop、poll.start/stop、buzz.enable/disable/start/reset、quiz.start/close、timer.start/pause/reset、workshop.open/close、card.push/withdraw。',inputSchema:{type:'object',properties:{room:{type:'string'},action:{type:'string',enum:['material.open','material.close','material.toggle','hw.open','hw.close','hw.toggle','screen.set','group.score','roll.start','roll.stop','poll.start','poll.stop','buzz.enable','buzz.disable','buzz.start','buzz.reset','quiz.start','quiz.close','timer.start','timer.pause','timer.reset','workshop.open','workshop.close','card.push','card.withdraw']},group:{type:'string'},delta:{type:'number'},view:{type:'string',enum:['course','data','report','workshop']},presetId:{type:'string'},question:{type:'string'},options:{type:'array',items:{type:'string'}},cardId:{type:'string'},id:{type:'string'},minutes:{type:'number'},mode:{type:'string',enum:['random','seq']},counts:{type:'object'},scores:{type:'object'}},required:['room','action']}}
   ];
 }
 function mcpHelpHtml(){
@@ -310,7 +335,7 @@ curl -s https://yscot.clawshell.online/mcp \
   </table>
   <h2>5. 常见错误</h2>
   <table><tr><th>现象</th><th>处理</th></tr>
-  <tr><td>401 unauthorized</td><td>检查 Bearer 令牌是否来自当前环境、是否多了空格；不要用浏览器 GET 代替 POST。</td></tr>
+  <tr><td>401 unauthorized</td><td>到工作台「个人信息 → MCP 接入令牌」复制；检查是否被重置或多了空格；不要用浏览器 GET 代替 POST。</td></tr>
   <tr><td>工具返回“题库为空”</td><td>先导入 <code>votebank.put</code> 或后台「在线答题」题库；投票题和答题题库不是同一份数据。</td></tr>
   <tr><td>找不到房间</td><td><code>room</code> 必须是 4 位大写场次码，例如 <code>YQ2X</code>。</td></tr>
   <tr><td>素材超过大小</td><td>单个素材 ≤ 10MB；MCP 请求体 ≤ 16MB，建议大文件走 <code>url</code> 外链。</td></tr>
@@ -334,6 +359,72 @@ async function mcpHandle(msg, mcpTeacher){
     try{
       if(name==='room.create'){ const code=createRoom(a.title,a.city,a.date,mcpTeacher&&mcpTeacher.id,a.province,a.project); return reply({content:[{type:'text',text:JSON.stringify({code,urls:{ops:'/ops?room='+code,screen:'/screen?room='+code}})}]}); }
       if(name==='room.list') return reply({content:[{type:'text',text:JSON.stringify(listRooms(mcpTeacher))}]});
+      if(name==='remote.state') return reply({content:[{type:'text',text:JSON.stringify(remoteView())}]});
+      if(name==='remote.control'){
+        const bad=function(msg){return reply({isError:true,content:[{type:'text',text:msg}]})};
+        const act=String(a.action||'');
+        state.config=state.config||{};
+        if(act.indexOf('material.')===0){ state.config.materialOpen=act==='material.open'?true:act==='material.close'?false:!state.config.materialOpen; save(); }
+        else if(act.indexOf('hw.')===0){ state.config.hwOpen=act==='hw.open'?true:act==='hw.close'?false:!state.config.hwOpen; save(); }
+        else if(act==='screen.set'){
+          let v=String(a.view||'data'); if(v==='report'||v==='stats')v='data'; if(['course','data','workshop'].indexOf(v)<0)return bad('view 只支持 course / data / workshop / report');
+          state.config.screenView=v; save();
+        }
+        else if(act==='group.score'){
+          const g=String(a.group||''); if(!state.groups[g])return bad('分组不存在：'+g); const d=Number(a.delta); if(!isFinite(d))return bad('delta 需要是数字');
+          state.groups[g].perf=(state.groups[g].perf||0)+d; save();
+        }
+        else if(act==='roll.start'||act==='roll.stop'){
+          state.roll=state.roll||{active:false,key:'',name:'',round:0,at:0};
+          if(act==='roll.stop'){state.roll.active=false;save();}
+          else{const keys=Object.keys(state.students||{});if(!keys.length)return bad('还没有学员，先让学员扫码进入');const k=keys[Math.floor(Math.random()*keys.length)];const st=state.students[k];state.roll={active:true,key:k,name:(st&&st.name)||'学员',round:(state.roll.round||0)+1,at:Date.now()};save();}
+        }
+        else if(act==='poll.start'||act==='poll.stop'){
+          if(act==='poll.stop'){state.poll.active=false;save();}
+          else{
+            let q=String(a.question||'').trim(), opts=(a.options||[]).map(String).filter(Boolean);
+            if(a.presetId){const p=(state.votePresets||[]).filter(function(x){return x.id===a.presetId})[0];if(!p)return bad('投票预置不存在：'+a.presetId);q=p.question;opts=(p.options||[]).slice();}
+            if(!q||opts.length<2)return bad('poll.start 需要 presetId，或 question + 至少两个 options');
+            state.poll={active:true,question:q,options:opts,votes:{},startedAt:new Date().toLocaleString('zh-CN')};save();
+          }
+        }
+        else if(act.indexOf('buzz.')===0){
+          state.buzz=state.buzz||{enabled:false,running:false,winner:'',at:''};
+          if(act==='buzz.enable'){state.buzz.enabled=true;state.buzz.running=false;state.buzz.winner='';}
+          else if(act==='buzz.disable'){state.buzz.enabled=false;state.buzz.running=false;}
+          else if(act==='buzz.start'){state.buzz.enabled=true;state.buzz.running=true;state.buzz.winner='';state.buzz.round=(state.buzz.round||0)+1;state.buzz.at=new Date().toLocaleString('zh-CN');}
+          else if(act==='buzz.reset'){state.buzz.running=false;state.buzz.winner='';}
+          else return bad('buzz 动作不支持：'+act);
+          save();
+        }
+        else if(act==='quiz.start'||act==='quiz.close'){
+          state.quiz=state.quiz||{bank:{choice:[],judge:[],blank:[],short:[]},answers:{}};
+          if(act==='quiz.close'){if(state.quiz.paper)state.quiz.paper.active=false;save();}
+          else{
+            const prev=state.quiz.config||{};
+            const cfg={mode:a.mode==='seq'?'seq':(a.mode==='random'?'random':(prev.mode==='seq'?'seq':'random')),counts:a.counts||prev.counts||{choice:5,judge:3,blank:2,short:1},scores:a.scores||prev.scores||{choice:2,judge:2,blank:3,short:10}};
+            const qs=quizBuildPaper(cfg); if(!qs.length)return bad('答题题库为空，或各类数量为 0；请先导入答题题库');
+            state.quiz.config=cfg;state.quiz.paper={active:true,at:new Date().toLocaleString('zh-CN'),mode:cfg.mode,counts:cfg.counts,scores:cfg.scores,questions:qs};state.quiz.answers={};state.quiz.papers={};
+            if(cfg.mode==='random'){Object.keys(state.students||{}).forEach(function(k){state.quiz.papers[k]=quizBuildPaper(cfg);});}
+            save();
+          }
+        }
+        else if(act.indexOf('timer.')===0){
+          state.timer=state.timer||{running:false,endAt:0,duration:0};
+          if(act==='timer.start'){const min=Math.max(1,Math.min(240,Number(a.minutes)||90));state.timer={running:true,endAt:Date.now()+min*60000,duration:min*60000};}
+          else if(act==='timer.pause'){state.timer.running=false;state.timer.endAt=0;}
+          else if(act==='timer.reset'){state.timer={running:false,endAt:0,duration:0};}
+          else return bad('timer 动作不支持：'+act);
+          save();
+        }
+        else if(act==='workshop.open'||act==='workshop.close'||act==='card.push'||act==='card.withdraw'){
+          if(act==='workshop.open'){state.config.workshopOpen=true;save();}
+          else if(act==='workshop.close'||act==='card.withdraw'){state.config.workshopOpen=false;state.config.activeCard='';save();}
+          else{const cid=String(a.cardId||a.id||'');const card=(state.cards||[]).filter(function(c){return c.id===cid})[0];if(!card)return bad('卡片不存在：'+cid);state.config.activeCard=cid;state.config.workshopOpen=true;save();}
+        }
+        else return bad('不支持的遥控器动作：'+act);
+        return reply({content:[{type:'text',text:JSON.stringify({ok:true,action:act,room:room,state:remoteView()})}]});
+      }
       if(name==='room.state') return reply({content:[{type:'text',text:JSON.stringify(screenView())}]});
       if(name==='poll.start'){ state.poll={active:true,question:String(a.question||''),options:(a.options||[]).map(String),votes:{},startedAt:new Date().toLocaleString('zh-CN')}; save(); return reply({content:[{type:'text',text:JSON.stringify({ok:true})}]}); }
       if(name==='poll.stop'){ state.poll.active=false; save(); return reply({content:[{type:'text',text:JSON.stringify({ok:true})}]}); }

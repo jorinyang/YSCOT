@@ -218,7 +218,61 @@ base64 文件（≤ 10MB）：
 
 > 投票题和答题题库是两套数据。投票题只在遥控器里出现；在线答题要先在后台「在线答题」导入题库，或用 MCP 导入答题题库后发布。
 
-## 七、常见错误
+## 七、语音控制遥控器
+
+MCP 除了导入内容，也能执行遥控器上的现场动作。语音 Agent 的推荐顺序：
+
+1. 先调 `remote.state` 看当前房间状态：投票、答题、计时、分组、卡片、素材/作业开关；
+2. 再调 `remote.control` 执行一个动作；
+3. 返回结果里带最新状态，可以让 Agent 复述「现在大屏是报告、投票进行中」。
+
+~~~json
+{
+  "name": "remote.state",
+  "arguments": { "room": "YQ2X" }
+}
+~~~
+
+~~~json
+{
+  "name": "remote.control",
+  "arguments": {
+    "room": "YQ2X",
+    "action": "screen.set",
+    "view": "report"
+  }
+}
+~~~
+
+常用口令到动作：
+
+| 讲师说法 | action | 额外参数 |
+| --- | --- | --- |
+| 大屏切到报告 / 切数据 | `screen.set` | `view: "report"`（内部映射到 data） |
+| 大屏切到课件 | `screen.set` | `view: "course"` |
+| 大屏切到工作坊 | `screen.set` | `view: "workshop"` |
+| 发素材 / 关素材 | `material.open` / `material.close` / `material.toggle` | — |
+| 开作业 / 关作业 | `hw.open` / `hw.close` / `hw.toggle` | — |
+| 开始投票 | `poll.start` | 先 `remote.state` 取 `presets`，传 `presetId`；也可传 `question` + `options` |
+| 结束投票 | `poll.stop` | — |
+| 抽一位 / 停止抽取 | `roll.start` / `roll.stop` | — |
+| 开抢答 / 开始抢答 | `buzz.enable` / `buzz.start` | — |
+| 关抢答 | `buzz.disable` | — |
+| 开始答题 / 结束答题 | `quiz.start` / `quiz.close` | `mode`、`counts`、`scores` 可省略，默认沿用答题配置 |
+| 开始计时 / 暂停 / 重置 | `timer.start` / `timer.pause` / `timer.reset` | `minutes` 默认 90 |
+| 打开/关闭工作坊 | `workshop.open` / `workshop.close` | — |
+| 推一张卡片 | `card.push` | 先 `remote.state` 取 `cards`，传 `cardId` |
+| 收回卡片 | `card.withdraw` | — |
+| A 组加两分 | `group.score` | `group: "A", delta: 2` |
+
+说明：
+
+- 所有动作都要带 4 位场次码 `room`；
+- 返回 `result.content[0].text` 是 JSON，含 `ok` 和最新 `state`；
+- 遥控器页面每 2.5 秒轮询，MCP 改完状态会自动出现在讲师手机和大屏；
+- 讲师个人 Token 只能操作自己的场次，管理员/服务令牌才能跨场次。
+
+## 八、常见错误
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
@@ -231,7 +285,7 @@ base64 文件（≤ 10MB）：
 | 素材失败 | 超过 10MB 或既无 `data_base64` 也无 `url` | 压缩文件或改用外链；两个字段二选一 |
 | 请求体被拒 | 超过 16MB | 大文件走 `url` 外链，或拆分成多个请求 |
 
-## 八、安全
+## 九、安全
 
 - 令牌只放服务端环境变量，不进前端、不进 GitHub、不发群；
 - 泄露后立即更换 `MCP_TOKEN` 并重启容器；
