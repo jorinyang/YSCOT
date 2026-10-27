@@ -10,3 +10,4 @@ Thumbs.db
 *.log
 *.tmp
 course-package-template/out.html
+.archify/

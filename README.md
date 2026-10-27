@@ -4,163 +4,297 @@
 
 <div align="center">
 
-**把一堂企业 AI 培训，从课前生成跑到课后复盘。**
+<p><strong>把一堂企业 AI 培训，从课前准备跑到课后复盘。</strong></p>
 
-[![Release](https://img.shields.io/github/v/release/jorinyang/YSCOT?style=flat-square&color=CBF74E)](https://github.com/jorinyang/YSCOT/releases)
-[![Node](https://img.shields.io/badge/Node-20+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-3355FF?style=flat-square)](LICENSE)
-[![DingTalk](https://img.shields.io/badge/DingTalk-OAuth-1E9FFF?style=flat-square)](https://open.dingtalk.com/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-CBF74E?style=flat-square)](#contributing)
+<p>
+  <a href="https://github.com/jorinyang/YSCOT/releases"><img src="https://img.shields.io/github/v/release/jorinyang/YSCOT?style=flat-square&color=CBF74E" alt="Release" height="20"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node-20+-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node 20+" height="20"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-3355FF?style=flat-square" alt="MIT License" height="20"></a>
+  <a href="https://open.dingtalk.com/"><img src="https://img.shields.io/badge/DingTalk-OAuth-1E9FFF?style=flat-square" alt="DingTalk OAuth" height="20"></a>
+  <a href="#contributing"><img src="https://img.shields.io/badge/PRs-welcome-CBF74E?style=flat-square" alt="PRs welcome" height="20"></a>
+</p>
 
-<img src="docs/images/hero.jpg" alt="YSCOT 四端协同" width="100%" />
+<img src="docs/images/sketch-hero.jpg" alt="YSCOT：讲师、大屏、学员手机在同一间课堂里协作" width="100%" />
 
 </div>
 
-讲师把课程大纲和课件丢进来，系统用模型生成课程页、宣传页、题库、过程素材和作业场景题；课堂上学员端、遥控器、课堂后台、大屏四个端同时跑；下课前作业评分和课堂报告已经就绪。
+YSCOT 是一个面向企业 AI 培训现场的 **课堂运营系统**。它不替代课程设计，而是把课程设计之后最容易散掉的那一段接起来：
 
-> **YSCOT（Yice Strategy Course Operation Tool）** · 企业 AI 培训的课堂运营系统
-> 原名 GTSCDT（Game Theory Strategy Course Development Tools），2026-10 更名为 YSCOT。
+- **课前**：建场次、放课件、导入题库 / 素材 / 卡片 / 评分标准；
+- **课中**：遥控器、课堂后台、授课大屏、学员手机四端同时跑；
+- **课后**：作业评分、课堂报告、数据导出，房间留下完整过程。
+
+> 线上环境：<https://yscot.clawshell.online>  
 > Node 20 零依赖服务 · 钉钉登录 · 房间模型 · 可私有化部署
+
+---
+
+## 16 秒看懂
+
+<p align="center">
+  <a href="docs/images/demo.mp4"><img src="docs/images/demo.gif" width="86%" alt="YSCOT 功能演示：场次入口、课堂内容、后台、遥控器、大屏和学员端" /></a>
+</p>
+
+<p align="center"><sub>场次入口 → 课程内容 → 课堂后台 → 遥控器 → 大屏 → 学员端　·　点击动图打开 MP4</sub></p>
+
+演示使用真实页面和演示房间，不含客户数据。
 
 ---
 
 ## 为什么做这个
 
-企业培训的痛点从来不是"没有课件"，而是**课件之后的整条链路**：
+企业培训的痛点通常不是“没有课件”，而是**课件之后的整条链路**：
 
-- 课前：大纲要变成课程页、宣传页、题库、素材、作业题，每次重做；
-- 课中：投票、抢答、计时、分组、作业提交散落在不同工具里；
-- 课后：作业评分靠人工翻文件，课堂数据留不下来。
+- 课前：课件、题库、素材、分组规则、评分标准散在不同工具里；
+- 课中：投票、抢答、计时、分组、作业提交各用一套，讲师要来回切；
+- 课后：作业靠人工翻文件，课堂过程留不下来，下一次还要重来。
 
-YSCOT 把这三段接成一条流水线：**一次上传，生成一套内容；一个房间，跑完一堂课；一份报告，留下全部过程数据。**
+YSCOT 的判断是：**一堂课应该有一个统一的“房间”对象。** 内容、人、互动、作业、报告都挂在这个房间上，四个端读写同一份课堂状态。
 
-<img src="docs/images/ai-generation.jpg" alt="从大纲到课程内容" width="100%" />
+<img src="docs/images/sketch-flow.jpg" alt="课前准备、课堂运行、课后复盘三段流程" width="100%" />
 
----
-
-## 页面预览
-
-> 截图来自本地 `ROOM0` 演示房间。
-
-| 登录 | 课程房间 |
-| :---: | :---: |
-| ![登录](docs/images/screens/login.png) | ![课程房间](docs/images/screens/room.png) |
-| **授课大屏** | **讲师遥控器** |
-| ![大屏](docs/images/screens/screen.png) | ![遥控器](docs/images/screens/remote.png) |
-| **学员端** | |
-| ![学员端](docs/images/screens/join.png) | |
-
----
-
-## 功能
-
-### 1 · AI 课程生成
-
-上传课程大纲与课件，一次生成整套课堂内容：
-
-| 生成物 | 用途 |
-| --- | --- |
-| 课程页 | 学员可回看的课程内容 |
-| 宣传页 | 课程预热与招生 |
-| 题库 | 选择 / 判断 / 填空 / 简答 |
-| 过程素材 | 案例、模板、参考材料 |
-| 作业场景题 | 工作坊六关实战任务 |
-
-- 支持 **docx / pptx / pdf / md / txt / html** 解析；
-- **pptx / pdf / html 保留原文件**用于展示下载；
-- **md / txt 生成统一风格的大纲框架页**；
-- 生成使用「模型配置」里保存的模型，不绑定厂商。
-
-### 2 · 课堂四端
-
-| 端 | 入口 | 学员 / 讲师能做什么 |
+| 阶段 | 讲师在做什么 | 系统留下什么 |
 | --- | --- | --- |
-| 学员交互端 | `/join` | 积分、抽签、投票、答题、提交作业、下载素材 |
-| 讲师遥控器 | `/remote` | 预置题目投票、素材发放、作业开关、开始答题、抢答轮次、工作坊计时、大屏切换、课件翻页 |
-| 课堂后台 | `/ops` | 投票题库、素材上传、分组、抢答开关、表现分、作业评分、在线答题 |
-| 授课大屏 | `/screen` | 数据统计 / 课程页 / 宣传页三视图，学员扫码加入 |
-
-<img src="docs/images/classroom.jpg" alt="课堂四端" width="100%" />
-
-### 3 · 房间与权限
-
-- 房间默认名 = **日期 + 城市**，可编辑、可删除；
-- 每个房间独立状态：学员、分组、投票、答题、作业、报告、素材；
-- **超级管理员看全部房间，讲师只看自己的房间**；
-- 钉钉登录保存头像、姓名、角色、部门；新讲师首次登录自动入名单；
-- 工作台四个标签：房间管理（默认）/ 模型配置 / 个人信息 / 讲师管理（超管）。
-
-### 4 · 内容与集成
-
-- **课程包**：上传 HTML、AI 生成、在线编辑五类内容；
-- **预渲染资产**：作业任务生成静态 HTML，学员页按版本缓存加载；
-- **嵌入**：`/embed.js` + `/embed` 小组件；
-- **MCP**：`/mcp` JSON-RPC，把课堂能力暴露给 Agent；
-- **报告**：学员、小组、答题、作业汇总，CSV 导出；
-- **全局响应式**：课堂后台、讲师遥控器、学员移动端共用一套断点与触控规则，手机 / 平板 / 桌面自适应。
+| **课前** | 新建场次，上传 PPTX / HTML，导入题库、素材、行动卡和评分标准 | 场次信息、课程文件、课堂状态 JSON |
+| **课中** | 用遥控器控制节奏，用后台管理人和互动，用大屏投课件 / 报告 / 工作坊 | 学员、分组、投票、抢答、答题、作业提交 |
+| **课后** | 打开作业评分，核对报告，导出 CSV | 评分结果、课堂报告、可归档的房间数据 |
 
 ---
 
-## 架构
+## 四端一屏：谁在用什么
 
-<img src="docs/images/architecture-v3.svg" alt="YSCOT 架构图：遥控器、课堂管理、学员端、作业评分、在线答题、大屏与四端" width="100%" />
+这里的“四端”指课堂上同时运行的四个角色页面；**场次入口**和**课程内容**是讲师在开课前使用的两个前置页面。
 
-**设计取向**
+| 页面 | 入口 | 谁在用 | 核心动作 |
+| --- | --- | --- | --- |
+| **场次入口** | `/room?code=ROOM0` | 讲师 / 助教 | 集中打开四端链接、展示学员二维码、管理本场文件 |
+| **讲师遥控器** | `/remote?room=ROOM0` | 讲师手机 | 素材 / 作业开关、大屏切换、小组积分、点名、投票、抢答、答题、工作坊、卡片 |
+| **课堂后台** | `/ops?room=ROOM0` | 讲师 / 助教电脑 | 课堂管理、作业评分、在线答题三个工作区 |
+| **授课大屏** | `/screen?room=ROOM0` | 投影 / 大屏 | 数据报告、课件、工作坊倒计时三种视图 |
+| **学员手机** | `/join?room=ROOM0` | 学员 | 扫码加入、抽签分组、投票、抢答、答题、领素材 / 卡片、交作业 |
+| **课程内容** | `/room-setup?code=ROOM0` | 讲师 / 助教 | 场次信息、PPTX、HTML 课程页面 |
 
-- **内容可导入**：投票题库、课程素材、行动卡 / 场景卡、作业评分标准都提供 MCP 工具，按场次写入；
-- **随机卷**：在线答题的 `random` 模式为每个学员单独抽题，防止互相抄答案。
-
-- **房间是核心对象**：内容、人、交互、报告都挂在房间上；
-- **单文件 JSON 状态**：零数据库依赖，可直接拷贝、归档、迁移；
-- **四端共用一个状态源**：轮询/提交都走同一份房间状态，避免多端不一致；
-- **模型可替换**：Base URL、模型名、Key 都在页面配置，不写死厂商。
+> **为什么课堂后台没有“课程内容”Tab？**  
+> 课程内容统一在场次页面的 `/room-setup` 管理；`/ops` 只保留现场会频繁操作的三块：课堂管理、作业评分、在线答题。入口更少，现场更不容易点错。
 
 ---
 
-## MCP 内容导入
+## 课前：把一节课装进房间
 
-课堂内容可以通过 MCP 按场次导入，讲师用同一个 `room` 参数指定场次：
+### 1. 建一个场次
 
-| 工具 | 内容 |
+登录后进入工作台，点「新建场次」，填写客户 / 项目、日期、省份和城市。场次名称默认由「日期 + 客户 / 项目」生成，也可以手动改。
+
+- 每个场次有 4 位房间码，例如 `6YCJ`；
+- 房间码会出现在所有端的 URL 里，也用于 MCP 按场次写入；
+- 新建后进入**场次入口页**，四端链接和学员二维码都在这一页。
+
+### 2. 放课程内容
+
+场次页面的「课程内容」支持两类文件：
+
+| 类型 | 课堂上怎么用 |
 | --- | --- |
-| `votebank.put` | 投票题库（问题 + 选项，追加或覆盖） |
-| `material.put` | 课程素材（base64 文件或 http(s) 外链） |
-| `card.put` | 行动卡 / 场景卡（主题、类型、内容、属性） |
-| `rubric.put` | 作业评分标准（按 T1–T6 关卡） |
+| **PPTX** | 大屏「课件」视图里逐页渲染，支持上一页 / 下一页和页码标签 |
+| **HTML** | 作为前端课程页直接在 iframe 中打开，适合交互式课程导航、长页面和自定义版式 |
 
-- 端点：`POST https://yscot.clawshell.online/mcp`（本地 `/mcp`）；
-- 鉴权：`Authorization: Bearer <MCP_TOKEN>`；
-- 字段、示例、错误码与大小限制：见 [MCP 内容导入标准](docs/09-MCP内容导入标准.md)。
+上传后，学员端、遥控器和大屏读取的是同一份房间文件；不需要再维护一套“大屏专用”的副本。
 
-## 快速开始
+<img src="docs/images/screens/setup.png" alt="课程内容页：场次信息、PPTX 和 HTML 上传" width="100%" />
 
-```bash
+### 3. 导入题库、素材、卡片和评分标准
+
+课堂后台的「课堂管理」可以手动添加投票题库、分组、行动卡 / 场景卡和作业配置。批量内容建议走 **MCP**，按 `room` 写入同一个场次：
+
+| MCP 工具 | 导入什么 | 典型用途 |
+| --- | --- | --- |
+| `votebank.put` | 投票题库 | 课前把 5–10 道投票题放进遥控器 |
+| `material.put` | 课程素材 | 案例、模板、阅读材料，学员端直接下载 |
+| `card.put` | 行动卡 / 场景卡 | 工作坊推进时投到大屏、推到学员手机 |
+| `rubric.put` | 作业评分标准 | 按 T1–T6 关卡配置评分点 |
+
+调用示例：
+
+~~~bash
+curl -X POST https://yscot.clawshell.online/mcp \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"votebank.put","arguments":{"room":"ROOM0","mode":"append","presets":[{"question":"你从什么时候开始接触 AI？","options":["今天第一次","用过几次","每周都用"]}]}}}'
+~~~
+
+字段、示例、错误码和大小限制见 [MCP 内容导入标准](docs/09-MCP内容导入标准.md)。
+
+---
+
+## 课中：四个端，一条节奏
+
+### 课堂后台：三个工作区
+
+打开 `/ops?room=ROOM0`，只有三个 Tab：
+
+| Tab | 解决什么 | 现场动作 |
+| --- | --- | --- |
+| **课堂管理** | 人和互动 | 投票题库、抽签与分组、点名、表现分、作业配置、素材 / 卡片 |
+| **作业评分** | 作业批改 | 查看提交、按评分标准打分、导出 CSV |
+| **在线答题** | 课堂测验 | 下载模板、导入题库、选顺序 / 随机出题、发布 / 结束答题 |
+
+<img src="docs/images/screens/ops.png" alt="课堂后台：课堂管理、作业评分、在线答题三个 Tab" width="100%" />
+
+几个关键行为：
+
+- **抽签与分组**：按人数平均分配，不超过每组上限；支持新增、编辑、删除、清空重抽；
+- **点名**：遥控器随机抽一位学员，学员端显示被点到的状态；
+- **在线答题**：随机模式下每个学员拿到不同试卷，降低互相抄答案；
+- **作业评分**：固定六关的评分结构，支持按评分标准评分和提交情况查看。
+
+### 讲师遥控器：手机就是控制台
+
+遥控器的设计目标是**单手完成课堂动作**，所以高频按钮放在第一屏：
+
+- 第一行：`素材发放` / `作业提交`；
+- 第二行：`大屏 · 课件` / `大屏 · 报告` / `大屏 · 工作坊`；
+- 往下是小组积分、点名、投票、抢答、答题、工作坊计时和卡片推送；
+- 点名支持「随机抽一位学员」和「停止抽取」，停止按钮就在抽取按钮下方。
+
+<img src="docs/images/screens/remote.png" alt="讲师遥控器：课堂控制、小组积分、点名" width="100%" />
+
+### 授课大屏：三种视图
+
+大屏不是一块“只能放 PPT”的屏幕，而是课堂节奏的公共显示面：
+
+| 视图 | 显示什么 | 什么时候切 |
+| --- | --- | --- |
+| **课件** | PPTX 逐页 / HTML 课程页 / 文件标签 / 页码 / 小组加减分 | 讲内容、翻课件、做课堂练习 |
+| **报告** | 学员、小组、答题、作业汇总 | 中场复盘、下课前总结 |
+| **工作坊** | 大号倒计时、当前行动卡 / 场景卡 | 小组讨论、实战工作坊 |
+
+<div align="center">
+  <img src="docs/images/screens/screen-course.png" alt="大屏课件视图：PPTX / HTML 文件标签、页码和小组加减分" width="100%" />
+  <br />
+  <sub>课件视图：文件标签 + 翻页 + 小组加减分</sub>
+</div>
+
+<div align="center">
+  <img src="docs/images/screens/screen-report.png" alt="大屏报告视图：学员、小组、答题汇总" width="100%" />
+  <br />
+  <sub>报告视图：课上到哪一步，一屏看见</sub>
+</div>
+
+<div align="center">
+  <img src="docs/images/screens/screen-workshop.png" alt="大屏工作坊视图：90 分钟倒计时" width="100%" />
+  <br />
+  <sub>工作坊视图：倒计时 + 行动卡</sub>
+</div>
+
+大屏课件页本身也是一个独立页面 `/course-screen?room=ROOM0`，可以单独投屏，也可以被 `/screen` 内嵌。它负责：
+
+- 从房间文件里筛出 `.pptx / .ppt / .html / .htm`；
+- 文件标签和 PPTX 页码标签；
+- 上一页 / 下一页；
+- 每个小组的 `−1 / +1`；
+- 学员端、遥控器、后台、大屏四个入口链接。
+
+### 学员手机：扫码就能参与
+
+学员不需要注册账号，填「姓名 + 手机号后四位」即可进入：
+
+1. 抽签分组；
+2. 投票、抢答、在线答题；
+3. 接收讲师推送的行动卡 / 场景卡；
+4. 下载课程素材；
+5. 提交作业。
+
+<img src="docs/images/screens/join.png" alt="学员端：姓名和手机号后四位进入课堂" width="70%" />
+
+---
+
+## 课后：评分、报告、归档
+
+### 作业评分
+
+课堂后台的「作业评分」是一个嵌入的评分工作台，按房间读取学员提交：
+
+- 查看提交列表和六关完成度；
+- 按评分标准逐项打分；
+- 查看总分、提交状态；
+- 导出 CSV 做二次分析。
+
+### 课堂报告
+
+`/report?room=ROOM0` 汇总：
+
+- 学员、尾号、小组、投票、抢答、作业数；
+- 小组人数和表现分；
+- 答题得分；
+- CSV 导出。
+
+大屏的「报告」视图和报告页共用同一份房间数据，所以课堂上看到的数字和课后导出不会对不上。
+
+---
+
+## 内容怎么进入课堂：一张数据流
+
+~~~mermaid
+flowchart LR
+  A[场次入口 /room] --> B[课程内容 /room-setup]
+  B --> C[房间文件: PPTX / HTML]
+  D[MCP 内容导入] --> E[房间状态 JSON]
+  C --> E
+  E --> F[遥控器 /remote]
+  E --> G[课堂后台 /ops]
+  E --> H[大屏 /screen]
+  E --> I[学员手机 /join]
+  F --> J[作业评分]
+  G --> J
+  J --> K[课堂报告 /report]
+~~~
+
+这条链路里有三个边界：
+
+1. **文件在房间里**：PPTX / HTML 按房间保存，不跟浏览器本地绑定；
+2. **状态在 JSON 里**：学员、分组、投票、答题、作业都写房间状态；
+3. **内容是导入的**：MCP 负责批量写入，课堂后台负责现场微调。
+
+---
+
+## 房间与权限
+
+- **管理员**：看到全部房间，包括默认房间 `ROOM0`；可以管理讲师；
+- **讲师**：只看到自己的房间；默认房间不在列表里；
+- **默认房间**：作为兜底演示房间存在，不可删除，只提供「清空」；
+- **学员**：不需要账号，用姓名 + 手机号后四位进入指定房间。
+
+| 能力 | 管理员 | 讲师 | 学员 |
+| --- | :---: | :---: | :---: |
+| 新建 / 编辑 / 删除自己的房间 | ✓ | ✓ | — |
+| 看到默认房间 | ✓ | — | — |
+| 管理讲师 | ✓ | — | — |
+| 课程内容上传 | ✓ | ✓ | — |
+| 课堂后台 / 遥控器 / 大屏 | ✓ | ✓ | — |
+| 学员互动 / 作业提交 | — | — | ✓ |
+
+---
+
+## 一分钟跑起来
+
+~~~bash
 git clone https://github.com/jorinyang/YSCOT.git
 cd YSCOT/templates
 node server.mjs
-```
+~~~
 
-打开 <http://127.0.0.1:8899>；线上：<https://yscot.clawshell.online>：
+打开 <http://127.0.0.1:8899>。首次使用可以配置本地口令，或直接接钉钉登录。
 
 | 页面 | 地址 |
 | --- | --- |
 | 登录 / 工作台 | `/` → `/home` |
-| 课程房间 | `/room?code=ROOM0` |
+| 场次入口 | `/room?code=ROOM0` |
 | 课程内容 | `/room-setup?code=ROOM0` |
 | 课堂后台 | `/ops?room=ROOM0` |
-| 遥控器 | `/remote?room=ROOM0` |
-| 大屏 | `/screen?room=ROOM0` |
+| 讲师遥控器 | `/remote?room=ROOM0` |
+| 授课大屏 | `/screen?room=ROOM0` |
+| 课件大屏 | `/course-screen?room=ROOM0` |
 | 学员端 | `/join?room=ROOM0` |
-
-Docker：
-
-```bash
-docker build -t yscot .
-docker run -d -p 8899:8899 \
-  -e SESSION_SECRET=change-me \
-  -e LOCAL_TEACHER_PASSWORD=change-me \
-  yscot
-```
 
 ### 环境变量
 
@@ -170,95 +304,124 @@ docker run -d -p 8899:8899 \
 | `SESSION_SECRET` | 登录 Cookie HMAC 密钥 |
 | `LOCAL_TEACHER_PASSWORD` | 本地口令兜底 |
 | `DINGTALK_CLIENT_ID` / `DINGTALK_CLIENT_SECRET` / `DINGTALK_CORP_ID` | 钉钉登录与部门同步 |
-| `PUBLIC_URL` | 公网地址，用于钉钉回调 |
+| `PUBLIC_URL` | 公网地址，用于钉钉回调和分享链接 |
 | `REQUIRE_AUTH` | `1` 开启强制登录 |
 | `MCP_TOKEN` | MCP 访问令牌 |
-| `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE` / `DEEPSEEK_MODEL` | 模型兜底配置（页面配置优先） |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE` / `DEEPSEEK_MODEL` | 模型兜底配置；页面配置优先 |
+
+### Docker
+
+~~~bash
+docker build -t yscot .
+docker run -d -p 8899:8899 \
+  -e SESSION_SECRET=change-me \
+  -e LOCAL_TEACHER_PASSWORD=change-me \
+  yscot
+~~~
+
+生产环境使用 Docker + Nginx 反向代理；部署细节见 [公网部署说明](docs/08-公网部署说明.md)。
 
 ---
 
-## 一堂课的完整流程
+## 架构
 
-1. **建房**：登录 → 房间管理 → 填城市/日期（名称留空即日期+城市）；
-2. **上传**：课程大纲 + 课件；pptx/pdf/html 保留原文件，md 生成框架页；
-3. **生成**：进度条走完，课程页/宣传页/题库/素材/作业题一起产出；
-4. **上课**：学员扫码加入 → 抽签分组 → 投票/抢答/答题 → 工作坊计时 → 作业提交；
-5. **评分**：课堂后台作业评分，AI 评分可复核；
-6. **复盘**：报告导出，积分公布；房间保留或删除。
+<img src="docs/images/architecture-v4.png" alt="YSCOT 系统架构：浏览器四端、Node 课堂服务、房间状态、课件素材、MCP 与模型 API" width="100%" />
 
-完整操作说明见 [docs/06-课堂使用说明-按课程流程.md](docs/06-课堂使用说明-按课程流程.md)。
+**这张图想说明三件事：**
 
-通过 MCP 导入投票题库、课程素材、行动卡 / 场景卡、作业评分标准的字段与示例，见 [docs/09-MCP内容导入标准.md](docs/09-MCP内容导入标准.md)。
+1. **浏览器只负责界面**：场次入口、遥控器、后台、大屏、学员手机都通过 REST / SSE 读写同一份课堂状态；
+2. **Node 单进程是课堂的调度中心**：零依赖 HTTP 服务同时提供页面、API、SSE 和 MCP；
+3. **内容和外部能力在两侧**：房间 JSON + 课件 / 素材是本地持久化；MCP 和模型 API 是可选的外部写入 / 评分能力。
+
+> 更细的端能力清单保留在 [旧版端能力全景](docs/images/architecture-v3.svg)，适合查某一个按钮属于哪个端；上面的 v4 图更适合第一次理解系统边界。
+
+### 设计取舍
+
+| 取舍 | 选择 | 代价 |
+| --- | --- | --- |
+| 数据层 | 每个房间一份 JSON | 零数据库、可直接拷贝归档；多实例并发写需要额外协调 |
+| 服务层 | Node 20 单进程、零依赖 | 部署简单、启动快；高并发多场次需要拆分或加锁 |
+| 课件 | PPTX 浏览器端渲染，HTML 用 iframe | 不依赖 Office / 转码服务；复杂动画、字体可能降级 |
+| 大屏 | 页面轮询 + SSE | 实现简单、断线可恢复；不是强实时协作 |
+| 内容导入 | MCP + 后台手填 | Agent 可批量写；MCP 令牌需要妥善保管 |
+
+**当前边界**：适合单场 / 小规模并发的企业培训现场；不建议多个 Node 实例共享同一个房间目录。HTML 课程页在沙箱 iframe 中打开，不读取本系统登录态。
 
 ---
 
 ## 目录结构
 
-```
+~~~text
 YSCOT/
 ├─ templates/
-│  ├─ server.mjs              房间 / 鉴权 / 生成 / 上传 / API / MCP
+│  ├─ server.mjs              房间 / 鉴权 / API / SSE / MCP
 │  ├─ ui.css                  全站主题（近黑 + 荧光绿 + 大圆角）
 │  ├─ login.html              分屏登录
-│  ├─ home.html               工作台
-│  ├─ room.html               课程房间（四端入口 + 二维码）
-│  ├─ room-setup.html         课程上传 / 生成 / 进度
-│  ├─ course/admin.html       课堂后台
+│  ├─ home.html               工作台：场次 / 模型 / 个人信息 / 讲师
+│  ├─ room.html               场次入口：四端链接 + 二维码
+│  ├─ room-setup.html         课程内容：场次信息 / PPTX / HTML
+│  ├─ course/
+│  │  ├─ admin.html           课堂后台：三个 Tab
+│  │  └─ grader.html          作业评分（iframe 内嵌）
 │  ├─ remote.html             讲师遥控器
-│  ├─ screen.html             授课大屏
+│  ├─ screen.html             授课大屏：课件 / 报告 / 工作坊
+│  ├─ course-screen.html      课件大屏：文件标签 / 页码 / 小组分
 │  ├─ live.html               学员端
 │  ├─ report.html             课堂报告
-│  ├─ packages.html           课程包管理
-│  ├─ package-edit.html       课程包编辑
-│  ├─ course-render.mjs       课程包渲染
-│  └─ materials/              学员素材
+│  ├─ dialog.js / dialog.css  统一弹窗
+│  └─ assets/
+│     └─ pptx-preview.umd.js  PPTX 浏览器端渲染
 ├─ docs/
-│  ├─ images/                 README 图片
-│  └─ *.md                    方法论 / 使用说明 / 部署
+│  ├─ images/                 README 配图、截图、演示 GIF / MP4
+│  └─ *.md                    方法论 / 使用说明 / 部署 / MCP
 ├─ deploy/                    Nginx / Compose / 环境变量模板
 ├─ Dockerfile
 └─ scripts/
-```
+~~~
+
+---
+
+## 文档
+
+- [系统说明](docs/03-系统说明.md)
+- [课程包架构（房间与课程包）](docs/05-架构-房间与课程包.md)
+- [课堂使用说明（按课程流程）](docs/06-课堂使用说明-按课程流程.md)
+- [钉钉联调与上线清单](docs/07-钉钉联调与上线清单.md)
+- [公网部署说明](docs/08-公网部署说明.md)
+- [MCP 内容导入标准](docs/09-MCP内容导入标准.md)
 
 ---
 
 ## Roadmap
 
 - [x] 房间模型与四端协同
-- [x] 钉钉登录、头像/角色、讲师与房间权限
-- [x] AI 课程生成（课程页 / 宣传页 / 题库 / 素材 / 作业）
-- [x] 大纲原文件保留、Markdown 框架页
-- [x] 遥控器 ↔ 大屏 ↔ 后台联动
-- [x] 全站视觉统一（参考 wb 风格）
-- [ ] 作业配置可视化
-- [ ] 课程包多模板
-- [ ] 移动端细节优化
+- [x] 钉钉登录、头像 / 角色、讲师与房间权限
+- [x] 场次入口：四端链接 + 学员二维码
+- [x] 课程内容：PPTX / HTML 按房间保存
+- [x] 课堂后台：课堂管理 / 作业评分 / 在线答题
+- [x] 大屏：课件 / 报告 / 工作坊三种视图
+- [x] 课件大屏：文件标签、页码、小组加减分
+- [x] 抽签分组、点名、投票、抢答、随机卷、工作坊计时
+- [x] MCP 内容导入（投票题库 / 素材 / 卡片 / 评分标准）
+- [x] 课堂报告与 CSV 导出
+- [ ] PPTX 更大文件的离线缓存与预加载
+- [ ] 多实例 / 数据库模式（多场次高并发）
+- [ ] 移动端细节继续打磨
 - [ ] 英文界面
 
 ---
 
 ## 版本记录
 
-| 版本 | 内容 |
+| 时间 | 内容 |
 | --- | --- |
-| **v0.4.1** | CUA 视觉复核修复：遥控器限宽、大屏二维码与强调色、学员端输入框、禁用态；测试房间清理 |
-| **v0.4** | 参考 wb 风格全站改版、分屏登录、工作台四标签、房间归属、大纲原文件与 md 框架页、四端联动 |
-| **v0.3** | 房间模型、大屏/遥控器、讲师登录、课程包、嵌入与 MCP |
+| **2026-10** | 课堂大屏课件 / 报告 / 工作坊；后台收敛为三个 Tab；课程内容统一到场次页；MCP 四类内容导入；默认房间权限与清空逻辑；PPTX / HTML 共存 |
+| **v0.4** | 参考 wb 风格全站改版、分屏登录、工作台四标签、房间归属、四端联动 |
+| **v0.3** | 房间模型、大屏 / 遥控器、讲师登录、课程包、嵌入与 MCP |
 | **v0.2** | 后台四标签、在线答题、模型管理、AI 评分 |
 | **v0.1** | 六页面 + 局域网服务 |
 
 更详细的变更见 [Releases](https://github.com/jorinyang/YSCOT/releases)。
-
----
-
-## 文档
-
-- [系统总体说明](docs/01-系统说明-YSCOT.md)
-- [方法论与设计原则](docs/02-方法论与设计原则.md)
-- [课程包架构](docs/05-架构-房间与课程包.md)
-- [课堂使用说明](docs/06-课堂使用说明-按课程流程.md)
-- [钉钉联调与上线清单](docs/07-钉钉联调与上线清单.md)
-- [公网部署说明](docs/08-公网部署说明.md)
 
 ---
 
