@@ -35,7 +35,9 @@ YSCOT 是一个面向企业 AI 培训现场的 **课堂运营系统**。它不�
   <a href="https://yscot.clawshell.online/demo"><img src="docs/images/demo-90.gif" width="86%" alt="YSCOT 93 秒动效演示：场次入口、课程内容、后台、遥控器、大屏、学员端和 MCP" /></a>
 </p>
 
-<p align="center"><sub>8 秒预览 · 93 秒完整演示　·　点击打开播放页　·　也可 [直接看 MP4](docs/images/demo-90.mp4)</sub></p>
+<p align="center"><sub>8 秒预览 · 93 秒完整演示　·　点击打开播放页</sub></p>
+
+<p align="center"><sub><a href="docs/images/demo-90.mp4">也可以直接打开 MP4</a></sub></p>
 
 > GitHub README 会过滤 `<video>` 标签，MP4 不能真正内嵌；完整视频放在播放页，README 用 GIF 做预览。
 
