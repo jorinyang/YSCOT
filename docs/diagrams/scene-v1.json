@@ -1,0 +1,732 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "YSCOT 场景全景",
+    "locale": "zh-CN",
+    "output": "yscot-scene.html",
+    "quality_profile": "standard",
+    "repository": {
+      "url": "git@github.com:jorinyang/YSCOT.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "e8c46471f01c285fab2e7c15a31dc7e3a325f973"
+    },
+    "views": [
+      {
+        "id": "vote",
+        "label": "投票",
+        "focus": [
+          "teacher",
+          "interaction",
+          "api",
+          "state",
+          "student",
+          "studentmod",
+          "screenmod",
+          "screen"
+        ]
+      },
+      {
+        "id": "quiz",
+        "label": "答题",
+        "focus": [
+          "teacher",
+          "quiz",
+          "api",
+          "state",
+          "student",
+          "studentmod",
+          "screenmod"
+        ]
+      },
+      {
+        "id": "homework",
+        "label": "作业",
+        "focus": [
+          "student",
+          "quiz",
+          "api",
+          "files",
+          "ops",
+          "screenmod",
+          "state"
+        ]
+      },
+      {
+        "id": "voice",
+        "label": "语音控制",
+        "focus": [
+          "agent",
+          "mcp",
+          "state",
+          "api",
+          "screen",
+          "student"
+        ]
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "teacher",
+      "type": "external",
+      "label": "讲师 / 助教手机",
+      "sublabel": "遥控器 · 现场控场",
+      "tag": "角色",
+      "icon": "person",
+      "pos": [
+        980,
+        110
+      ],
+      "size": [
+        220,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/login.html",
+          "line": 50
+        },
+        {
+          "path": "templates/remote.html",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "id": "student",
+      "type": "external",
+      "label": "学员手机",
+      "sublabel": "扫码 · 抽签 · 投票 · 作业",
+      "tag": "角色",
+      "icon": "person",
+      "pos": [
+        260,
+        1120
+      ],
+      "size": [
+        220,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/live.html",
+          "line": 102
+        }
+      ]
+    },
+    {
+      "id": "ops",
+      "type": "external",
+      "label": "课堂后台",
+      "sublabel": "课堂管理 · 作业评分 · 答题",
+      "tag": "桌面",
+      "pos": [
+        1540,
+        450
+      ],
+      "size": [
+        200,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/course/admin.html",
+          "line": 58
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "type": "database",
+      "label": "课程文件",
+      "sublabel": "PPTX / HTML / 素材",
+      "tag": "uploads",
+      "icon": "none",
+      "pos": [
+        300,
+        120
+      ],
+      "size": [
+        200,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 809
+        }
+      ]
+    },
+    {
+      "id": "screen",
+      "type": "external",
+      "label": "授课大屏",
+      "sublabel": "课件 · 报告 · 工作坊",
+      "tag": "现场",
+      "icon": "none",
+      "pos": [
+        1260,
+        1120
+      ],
+      "size": [
+        220,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/screen.html",
+          "line": 41
+        }
+      ]
+    },
+    {
+      "id": "dingtalk",
+      "type": "external",
+      "label": "钉钉开放平台",
+      "sublabel": "OAuth · 通讯录",
+      "tag": "外部",
+      "icon": "external",
+      "pos": [
+        40,
+        420
+      ],
+      "size": [
+        200,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 697
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "type": "external",
+      "label": "模型 API",
+      "sublabel": "生成 · 评分（可选）",
+      "tag": "外部",
+      "icon": "cloud",
+      "pos": [
+        40,
+        760
+      ],
+      "size": [
+        200,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 896
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "external",
+      "label": "AI Agent / 语音",
+      "sublabel": "Bearer · remote.control",
+      "tag": "Agent",
+      "icon": "person",
+      "pos": [
+        880,
+        1060
+      ],
+      "size": [
+        220,
+        70
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 322
+        }
+      ]
+    },
+    {
+      "id": "content",
+      "type": "backend",
+      "label": "场次与内容",
+      "sublabel": "建场次 · PPTX/HTML · 素材",
+      "tag": "① 内容",
+      "icon": "none",
+      "pos": [
+        500,
+        280
+      ],
+      "size": [
+        240,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/room-setup.html",
+          "line": 63
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 809
+        }
+      ]
+    },
+    {
+      "id": "interaction",
+      "type": "backend",
+      "label": "课堂互动",
+      "sublabel": "投票 · 抢答 · 抽签 · 积分 · 计时",
+      "tag": "② 互动",
+      "icon": "none",
+      "pos": [
+        1000,
+        280
+      ],
+      "size": [
+        240,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/remote.html",
+          "line": 50
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 1349
+        }
+      ]
+    },
+    {
+      "id": "quiz",
+      "type": "backend",
+      "label": "作业与答题",
+      "sublabel": "题库 · 随机卷 · 提交 · 评分",
+      "tag": "③ 作业/答题",
+      "icon": "none",
+      "pos": [
+        1280,
+        560
+      ],
+      "size": [
+        240,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 1206
+        },
+        {
+          "path": "templates/live.html",
+          "line": 121
+        }
+      ]
+    },
+    {
+      "id": "screenmod",
+      "type": "backend",
+      "label": "大屏与报告",
+      "sublabel": "课件/报告/工作坊 · CSV",
+      "tag": "④ 展示",
+      "icon": "none",
+      "pos": [
+        1000,
+        900
+      ],
+      "size": [
+        240,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/screen.html",
+          "line": 41
+        },
+        {
+          "path": "templates/report.html",
+          "line": 30
+        }
+      ]
+    },
+    {
+      "id": "studentmod",
+      "type": "backend",
+      "label": "学员与分组",
+      "sublabel": "扫码 · 抽签 · 小组 · 素材",
+      "tag": "⑤ 学员",
+      "icon": "none",
+      "pos": [
+        500,
+        900
+      ],
+      "size": [
+        240,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/live.html",
+          "line": 102
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 190
+        }
+      ]
+    },
+    {
+      "id": "identity",
+      "type": "security",
+      "label": "身份与接入",
+      "sublabel": "钉钉 OAuth · 本地口令 · Token",
+      "tag": "⑥ 接入",
+      "icon": "none",
+      "pos": [
+        220,
+        560
+      ],
+      "size": [
+        240,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 35
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 53
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "REST API",
+      "sublabel": "Node 20 · 房间路由",
+      "tag": "控制面",
+      "icon": "none",
+      "pos": [
+        680,
+        560
+      ],
+      "size": [
+        250,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 645
+        }
+      ]
+    },
+    {
+      "id": "state",
+      "type": "database",
+      "label": "房间状态",
+      "sublabel": "poll · quiz · groups · timer",
+      "tag": "数据面",
+      "icon": "none",
+      "pos": [
+        1004,
+        560
+      ],
+      "size": [
+        250,
+        88
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 92
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP",
+      "sublabel": "remote.state / control · 16 工具",
+      "tag": "Agent 入口",
+      "icon": "none",
+      "pos": [
+        880,
+        720
+      ],
+      "size": [
+        240,
+        84
+      ],
+      "sources": [
+        {
+          "path": "templates/server.mjs",
+          "line": 234
+        },
+        {
+          "path": "templates/server.mjs",
+          "line": 322
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "服务内核 · API + 房间状态",
+      "wraps": [
+        "api",
+        "state",
+        "mcp"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "① 场次与内容",
+      "wraps": [
+        "files",
+        "content"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "② 课堂互动",
+      "wraps": [
+        "teacher",
+        "interaction"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "③ 作业与答题",
+      "wraps": [
+        "quiz",
+        "ops"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "④ 大屏与报告",
+      "wraps": [
+        "screenmod",
+        "screen"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "⑤ 学员与分组",
+      "wraps": [
+        "studentmod",
+        "student"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "⑥ 身份与接入",
+      "wraps": [
+        "identity",
+        "dingtalk",
+        "model"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "id": "files-content",
+      "from": "files",
+      "to": "content",
+      "label": "课件/素材"
+    },
+    {
+      "id": "teacher-interaction",
+      "from": "teacher",
+      "to": "interaction",
+      "label": "① 遥控"
+    },
+    {
+      "id": "teacher-quiz",
+      "from": "teacher",
+      "to": "quiz",
+      "label": "① 发布答题"
+    },
+    {
+      "id": "ops-quiz",
+      "from": "ops",
+      "to": "quiz",
+      "label": "配置/评分"
+    },
+    {
+      "id": "student-studentmod",
+      "from": "student",
+      "to": "studentmod",
+      "label": "① 扫码/抽签"
+    },
+    {
+      "id": "screenmod-screen",
+      "from": "screenmod",
+      "to": "screen",
+      "label": "投屏"
+    },
+    {
+      "id": "dingtalk-identity",
+      "from": "dingtalk",
+      "to": "identity",
+      "label": "OAuth"
+    },
+    {
+      "id": "api-model",
+      "from": "api",
+      "to": "model",
+      "label": "生成/评分（可选）",
+      "variant": "dashed"
+    },
+    {
+      "id": "content-api",
+      "from": "content",
+      "to": "api",
+      "label": "上传/读取"
+    },
+    {
+      "id": "interaction-api",
+      "from": "interaction",
+      "to": "api",
+      "label": "② REST"
+    },
+    {
+      "id": "quiz-api",
+      "from": "quiz",
+      "to": "api",
+      "label": "② 出卷/提交"
+    },
+    {
+      "id": "screenmod-api",
+      "from": "screenmod",
+      "to": "api",
+      "label": "读报告"
+    },
+    {
+      "id": "studentmod-api",
+      "from": "studentmod",
+      "to": "api",
+      "label": "学员状态"
+    },
+    {
+      "id": "identity-api",
+      "from": "identity",
+      "to": "api",
+      "label": "校验登录"
+    },
+    {
+      "id": "api-state",
+      "from": "api",
+      "to": "state",
+      "label": "③ 读写状态",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-files",
+      "from": "api",
+      "to": "files",
+      "label": "课程文件"
+    },
+    {
+      "id": "mcp-state",
+      "from": "mcp",
+      "to": "state",
+      "label": "② remote.control",
+      "variant": "emphasis",
+      "labelAt": [
+        1050,
+        662
+      ]
+    },
+    {
+      "id": "agent-mcp",
+      "from": "agent",
+      "to": "mcp",
+      "label": "① JSON-RPC + Bearer",
+      "variant": "emphasis"
+    },
+    {
+      "id": "state-student",
+      "from": "state",
+      "to": "student",
+      "label": "④ 轮询/同步",
+      "variant": "dashed"
+    },
+    {
+      "id": "state-screen",
+      "from": "state",
+      "to": "screen",
+      "label": "③ 轮询结果",
+      "variant": "dashed"
+    },
+    {
+      "id": "quiz-student",
+      "from": "quiz",
+      "to": "student",
+      "label": "⑤ 答题/作业",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-screenmod",
+      "from": "api",
+      "to": "screenmod",
+      "label": "⑥ 报告"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "四维读图",
+      "items": [
+        "时间：沿 ①→⑥ 读主动线，课前→课中→课后",
+        "空间：内核 → 六域 → 交互对象",
+        "因果：实线命令，虚线轮询/反馈",
+        "本体：房间、学员、分组、投票、答题、文件、Token"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "实体映射",
+      "items": [
+        "Room → state.json / room.json",
+        "Poll / Quiz / Timer / Card → state.*",
+        "课程文件 → uploads/",
+        "个人 Token → mcp-tokens.json",
+        "报告 → API 聚合 / CSV"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "四条主动线",
+      "items": [
+        "投票：手机 → 互动 → API → 状态 → 学员 → 大屏",
+        "答题：后台 → 题库 → API → 学员 → 报告",
+        "作业：学员 → 文件 → 后台评分 → 报告",
+        "语音：Agent → MCP → 状态 → 大屏/学员"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "边界与角色",
+      "items": [
+        "讲师/助教：遥控、后台、内容",
+        "学员：扫码、抽签、投票、答题、作业",
+        "管理员：场次、身份、评分",
+        "外部：钉钉、模型、AI Agent"
+      ]
+    }
+  ]
+}

@@ -371,6 +371,8 @@ docker run -d -p 8899:8899 \
 > 这版用 archify 重新生成，以原架构图的全景结构为底稿，补全了场次入口 /room、课程内容 /room-setup、大屏课件 /course-screen、报告 /report、作业评分、投票/答题分离和讲师个人 MCP token。
 >
 > 交互版：[打开可缩放架构图](https://yscot.clawshell.online/architecture) · [候选 JSON](docs/diagrams/architecture-v4.json)
+>
+> 场景版草稿：[场景全景 v1](https://yscot.clawshell.online/scene) · [候选 JSON](docs/diagrams/scene-v1.json)。这版按“双核 + 三环 + 六域 + 四条主动线”重画，先供评审，暂不替换上面的技术总览。
 
 ### 设计取舍
 
