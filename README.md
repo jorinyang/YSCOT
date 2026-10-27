@@ -115,7 +115,7 @@ YSCOT 的判断是：**一堂课应该有一个统一的“房间”对象。** 
 
 ### 三步接入
 
-1. **取令牌**：服务器 `deploy/.env` 里的 `MCP_TOKEN`；不要写进前端或仓库。
+1. **取令牌**：登录后打开「工作台 → 个人信息 → MCP 接入令牌」，复制自己的 token；每个讲师一套，可随时重置。
 2. **配客户端**：URL 用 `https://yscot.clawshell.online/mcp`，请求头带 `Authorization: Bearer <MCP_TOKEN>`。
 3. **先验证**：调用 `tools/list`，看到 `tools` 数组再开始写入。
 
@@ -144,6 +144,8 @@ curl -s https://yscot.clawshell.online/mcp \
 ~~~
 
 > `/mcp` 不是普通网页，而是 **POST + JSON-RPC 2.0** 端点。浏览器直接打开会看到接入说明；不带 Bearer 会返回 `401 unauthorized`，这不是服务坏了。
+>
+> 令牌按讲师生成，只对本人场次生效；在个人页「重置」后旧 token 立即失效。
 >
 > **投票题和在线答题题库是两套数据。** `votebank.put` 只影响遥控器投票；在线答题要先在后台「在线答题」导入题库，或用 MCP 写入答题题库后再 `quiz.publish`。
 

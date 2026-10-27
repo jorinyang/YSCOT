@@ -48,6 +48,43 @@ async function dingDept(unionId){
 function loadTeachers(){ try{ return JSON.parse(fs.readFileSync(TEACHERS_FILE,'utf8')); }catch(e){ return []; } }
 function freshTeacher(t){ if(!t) return t; try{ const list=loadTeachers(); const m=list.filter(function(x){return x.id===t.id||(t.dingUnionId&&x.dingUnionId===t.dingUnionId);})[0]; return m?Object.assign({},t,m):t; }catch(e){ return t; } }
 function saveTeachers(list){ fs.mkdirSync(path.dirname(TEACHERS_FILE),{recursive:true}); fs.writeFileSync(TEACHERS_FILE, JSON.stringify(list,null,1)); }
+
+// 讲师级 MCP 令牌：每个讲师在个人页面看到自己的 token，可重置。
+const MCP_TOKENS_FILE = path.join(DATA_DIR,'mcp-tokens.json');
+function loadMcpTokens(){ try{ const j=JSON.parse(fs.readFileSync(MCP_TOKENS_FILE,'utf8')); return (j&&j.tokens)||{}; }catch(e){ return {}; } }
+function saveMcpTokens(tokens){ fs.mkdirSync(path.dirname(MCP_TOKENS_FILE),{recursive:true}); fs.writeFileSync(MCP_TOKENS_FILE, JSON.stringify({tokens:tokens||{}},null,1)); }
+function mcpTeacherId(t){ return String((t&&(t.id||t.dingUnionId||t.dingUserId))||''); }
+function ensureMcpToken(t){
+  if(!t) return null;
+  const id=mcpTeacherId(t); if(!id) return null;
+  const tokens=loadMcpTokens(); let rec=tokens[id];
+  if(rec&&rec.token) { if(rec.name!==t.name){ rec.name=t.name||''; tokens[id]=rec; saveMcpTokens(tokens); } return rec; }
+  rec={token:'ysc_'+crypto.randomBytes(24).toString('hex'),name:t.name||'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  tokens[id]=rec; saveMcpTokens(tokens); return rec;
+}
+function resetMcpToken(t){
+  if(!t) return null;
+  const id=mcpTeacherId(t); if(!id) return null;
+  const tokens=loadMcpTokens();
+  const rec={token:'ysc_'+crypto.randomBytes(24).toString('hex'),name:t.name||'',createdAt:(tokens[id]&&tokens[id].createdAt)||new Date().toISOString(),updatedAt:new Date().toISOString()};
+  tokens[id]=rec; saveMcpTokens(tokens); return rec;
+}
+function teacherByMcpToken(token){
+  const tok=String(token||'').trim(); if(!tok) return null;
+  const tokens=loadMcpTokens();
+  for(const id of Object.keys(tokens)){
+    const rec=tokens[id]||{}; if(rec.token!==tok) continue;
+    if(id==='local') return {id:'local',name:rec.name||'本地讲师',role:'admin'};
+    const t=loadTeachers().filter(function(x){return String(x.id)===id})[0];
+    return t?Object.assign({},t,{id:id}):null;
+  }
+  return null;
+}
+function canMcpRoom(t, code){
+  if(!t || t.role==='admin') return true;
+  try{ const meta=JSON.parse(fs.readFileSync(roomMetaFile(code),'utf8')); return !!(meta&&meta.owner&&String(meta.owner)===String(t.id)); }catch(e){ return false; }
+}
+
 let currentRoom = DEFAULT_ROOM;
 function roomStateFile(code){ return code===DEFAULT_ROOM ? STATE_FILE : path.join(ROOMS_DIR, code, 'state.json'); }
 function roomMetaFile(code){ return code===DEFAULT_ROOM ? path.join(DATA_DIR, 'room.json') : path.join(ROOMS_DIR, code, 'room.json'); }
@@ -225,7 +262,7 @@ function mcpHelpHtml(){
   </style></head><body><main>
   <h1>YSCOT MCP 接入说明</h1>
   <p class="muted">这里是 MCP JSON-RPC 端点，不是普通网页。浏览器直接打开看到这一段是正常的；AI 客户端应使用 POST 请求。</p>
-  <div class="card warn"><b>先看这一条：401 unauthorized 不是服务坏了。</b><br>需要在请求头带 <code>Authorization: Bearer &lt;MCP_TOKEN&gt;</code>。令牌只放在服务端 <code>deploy/.env</code> 的 <code>MCP_TOKEN</code>，不要写进前端，也不要发给外部。</div>
+  <div class="card warn"><b>先看这一条：401 unauthorized 不是服务坏了。</b><br>需要在请求头带 <code>Authorization: Bearer &lt;MCP_TOKEN&gt;</code>。登录后在工作台「个人信息」页的「MCP 接入令牌」里查看，可复制、可重置；只对当前讲师的场次生效，不要发给外部。</div>
   <h2>1. 客户端配置（通用 MCP HTTP）</h2>
   <pre>{
   "mcpServers": {
@@ -240,7 +277,7 @@ function mcpHelpHtml(){
 }</pre>
   <p class="muted">不同客户端的字段名可能略有差异；核心只有两个：URL 和 Authorization 请求头。</p>
   <h2>2. 先用 curl 验证</h2>
-  <pre>export MCP_TOKEN='从服务器 deploy/.env 取'
+  <pre>export MCP_TOKEN='从工作台 → 个人信息 → MCP 接入令牌 复制'
 curl -s https://yscot.clawshell.online/mcp \
   -X POST \
   -H "Authorization: Bearer $MCP_TOKEN" \
@@ -293,9 +330,10 @@ async function mcpHandle(msg){
     const name=msg.params&&msg.params.name; const a=(msg.params&&msg.params.arguments)||{};
     const room=validRoom(a.room)?a.room:DEFAULT_ROOM;
     setRoom(room);
+    if(name!=='room.create'&&name!=='room.list'&&!canMcpRoom(mcpTeacher,room)) return reply({isError:true,content:[{type:'text',text:'无权操作该房间：该场次不属于当前令牌的讲师'}]});
     try{
-      if(name==='room.create'){ const code=createRoom(a.title); return reply({content:[{type:'text',text:JSON.stringify({code,urls:{ops:'/ops?room='+code,screen:'/screen?room='+code}})}]}); }
-      if(name==='room.list') return reply({content:[{type:'text',text:JSON.stringify(listRooms())}]});
+      if(name==='room.create'){ const code=createRoom(a.title,a.city,a.date,mcpTeacher&&mcpTeacher.id,a.province,a.project); return reply({content:[{type:'text',text:JSON.stringify({code,urls:{ops:'/ops?room='+code,screen:'/screen?room='+code}})}]}); }
+      if(name==='room.list') return reply({content:[{type:'text',text:JSON.stringify(listRooms(mcpTeacher))}]});
       if(name==='room.state') return reply({content:[{type:'text',text:JSON.stringify(screenView())}]});
       if(name==='poll.start'){ state.poll={active:true,question:String(a.question||''),options:(a.options||[]).map(String),votes:{},startedAt:new Date().toLocaleString('zh-CN')}; save(); return reply({content:[{type:'text',text:JSON.stringify({ok:true})}]}); }
       if(name==='poll.stop'){ state.poll.active=false; save(); return reply({content:[{type:'text',text:JSON.stringify({ok:true})}]}); }
@@ -629,12 +667,13 @@ const server=http.createServer(async (req,res)=>{
       if(req.method==='GET'){ res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); return res.end(mcpHelpHtml()); }
       return send(res,405,{jsonrpc:'2.0',error:{code:-32600,message:'MCP 只接受 POST JSON-RPC'},id:null});
     }
-    if(process.env.MCP_TOKEN){
-      const auth=String(req.headers.authorization||'');
-      if(auth!=='Bearer '+process.env.MCP_TOKEN) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized: 需要 Authorization: Bearer <MCP_TOKEN>，使用 POST JSON-RPC'},id:null});
-    }
+    const auth=String(req.headers.authorization||'');
+    const bearer=auth.indexOf('Bearer ')===0?auth.slice(7).trim():'';
+    let mcpTeacher=teacherByMcpToken(bearer);
+    if(!mcpTeacher&&process.env.MCP_TOKEN&&bearer===process.env.MCP_TOKEN) mcpTeacher={id:'local',name:'服务令牌',role:'admin'};
+    if(!mcpTeacher) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized: 请使用工作台「个人信息 → MCP 接入令牌」里的个人 token，并放在 Authorization: Bearer 后'},id:null});
     const body=await readBody(req,16*1024*1024);
-    const reply=await mcpHandle(body);
+    const reply=await mcpHandle(body,mcpTeacher);
     return send(res,200,reply);
   }
   if(p==='/api/auth/config') return send(res,200,{ok:true,dingtalk:!!(DING_ID&&DING_SECRET),local:!!LOCAL_PASSWORD,required:AUTH_REQUIRED});
@@ -737,6 +776,16 @@ const server=http.createServer(async (req,res)=>{
     function fromErrMsg(msg){ const m=String(msg||'').match(/https:\/\/open-dev\.dingtalk\.com\/appscope\/apply\?[^\s,]+/); if(m) out.applyUrl=m[0]; }
     global.__dingDiag={at:now,data:out};
     return send(res,200,out);
+  }
+  if(p==='/api/me/mcp-token'){
+    const t=freshTeacher(getTeacher(req)); if(!t) return send(res,401,{ok:false,error:'请先登录'});
+    if(req.method==='GET'){ const rec=ensureMcpToken(t); return send(res,200,{ok:true,token:rec.token,name:t.name||'',updatedAt:rec.updatedAt}); }
+    if(req.method==='POST'){
+      const b=await readBody(req);
+      if(b.action!=='reset') return send(res,400,{ok:false,error:'action 必须是 reset'});
+      const rec=resetMcpToken(t); return send(res,200,{ok:true,token:rec.token,name:t.name||'',updatedAt:rec.updatedAt});
+    }
+    return send(res,405,{ok:false,error:'method not allowed'});
   }
   if(p==='/api/me'){ const t=getTeacher(req); const f=freshTeacher(t); if(f){ try{ setTeacherCookie(res,f); }catch(e){} } return send(res,200,{ok:true,teacher:f}); }
   if(p==='/api/teachers' && req.method==='GET') return send(res,200,{ok:true,teachers:loadTeachers()});

@@ -5,7 +5,7 @@
 ## 一、接入
 
 - 传输：HTTP POST，JSON-RPC 2.0；
-- 鉴权：`Authorization: Bearer <MCP_TOKEN>`；
+- 鉴权：`Authorization: Bearer <讲师个人 token>`；token 在工作台「个人信息 → MCP 接入令牌」查看，可重置；
 - 房间：所有工具都接受 `room`（4 位大写场次码），不传时使用默认房间；
 - 返回：`result.content[0].text` 是 JSON 字符串；失败时带 `isError: true`。
 

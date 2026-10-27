@@ -51,6 +51,17 @@ input,select{background:rgba(255,255,255,.05);border:1px solid var(--line);borde
 
   <div id="pane-me">
     <div class="card"><div class="k">个人信息</div><div class="big" id="meInfo"></div><div class="warn hidden" id="dingWarn"></div></div>
+    <div class="card" style="margin-top:14px">
+      <div class="k">MCP 接入令牌</div>
+      <p class="small muted" style="margin:6px 0 10px">给 AI Agent / MCP 客户端使用。每个讲师一套，只对当前讲师自己的场次生效；重置后旧令牌立即失效。</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <input id="mcpToken" readonly autocomplete="off" style="flex:1;min-width:280px;font-family:Consolas,monospace;font-size:12px" />
+        <button class="btn" id="mcpCopy">复制</button>
+        <button class="btn" id="mcpReset">重置</button>
+      </div>
+      <div class="small muted" id="mcpMsg" style="margin-top:6px"></div>
+      <div class="small" style="margin-top:6px"><a href="/mcp" target="_blank" rel="noopener">MCP 接入说明</a></div>
+    </div>
   </div>
 
   <div id="pane-model" class="hidden">
@@ -255,5 +266,23 @@ function loadTeachers(){
 $('tAdd').onclick=function(){ fetch('/api/teachers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('tName').value,role:$('tRole').value,dept:$('tDept').value,dingUnionId:$('tUnion').value})}).then(function(r){return r.json()}).then(function(d){ if(d.ok){loadTeachers();$('tMsg').textContent='已添加'} else $('tMsg').textContent=d.error||'失败'; }); };
 $('mTest').onclick=function(){ $('mMsg').textContent='测试中…'; fetch('/api/admin/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'test',baseUrl:$('mBase').value,model:$('mModel').value,apiKey:$('mKey').value})}).then(function(r){return r.json()}).then(function(d){ $('mMsg').textContent=d.ok?('连通正常 · '+d.model+' · '+d.ms+'ms'):('失败：'+(d.error||'')); }); };
 $('mSave').onclick=function(){ fetch('/api/admin/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',baseUrl:$('mBase').value,model:$('mModel').value,apiKey:$('mKey').value})}).then(function(r){return r.json()}).then(function(d){ $('mKey').value=''; $('mMsg').textContent=d.ok?'已保存':'保存失败'; loadModel(); }); };
-loadMe().then(function(){ loadModel(); loadRooms(); if(ME&&ME.role==='admin')loadTeachers(); var h=(location.hash||'').replace('#',''); if(['me','model','rooms','teachers'].indexOf(h)>=0)show(h); else show('rooms'); });
+function loadMcpToken(){
+  fetch('/api/me/mcp-token',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
+    if(!d.ok){$('mcpMsg').textContent=d.error||'读取失败';return}
+    $('mcpToken').value=d.token||''; $('mcpMsg').textContent='仅当前登录账号可见 · '+(d.updatedAt?('更新于 '+new Date(d.updatedAt).toLocaleString('zh-CN')):'');
+  }).catch(function(){ $('mcpMsg').textContent='读取失败，请刷新重试'; });
+}
+$('mcpCopy').onclick=function(){
+  var v=$('mcpToken').value; if(!v)return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v).then(function(){$('mcpMsg').textContent='已复制，粘贴到 MCP 客户端的 Authorization 里'},function(){$('mcpToken').select();document.execCommand('copy');$('mcpMsg').textContent='已复制'}) }
+  else { $('mcpToken').select(); document.execCommand('copy'); $('mcpMsg').textContent='已复制'; }
+};
+$('mcpReset').onclick=function(){
+  if(!confirm('重置后旧 token 立即失效，需要把新 token 重新填到 MCP 客户端。继续？')) return;
+  fetch('/api/me/mcp-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})}).then(function(r){return r.json()}).then(function(d){
+    if(!d.ok){$('mcpMsg').textContent=d.error||'重置失败';return}
+    $('mcpToken').value=d.token||''; $('mcpMsg').textContent='已重置：旧 token 已失效';
+  }).catch(function(){ $('mcpMsg').textContent='重置失败，请重试'; });
+};
+loadMe().then(function(){ loadModel(); loadRooms(); loadMcpToken(); if(ME&&ME.role==='admin')loadTeachers(); var h=(location.hash||'').replace('#',''); if(['me','model','rooms','teachers'].indexOf(h)>=0)show(h); else show('rooms'); });
 </script></body></html>

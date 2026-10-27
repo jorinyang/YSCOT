@@ -11,29 +11,28 @@
 - 不带 `Authorization` 调：返回 `401 unauthorized`；
 - AI Agent 看到 401 时，应该补 token，**不要再去抓网页后台**。
 
-## 二、准备令牌
+## 二、准备令牌（每个讲师一套）
 
-MCP 令牌只放在服务器：
+MCP 令牌在**讲师登录后的个人页面**生成和查看，不在服务器环境变量里手工配：
 
-~~~bash
-# 在部署机执行，不要把输出贴到聊天或前端
-grep '^MCP_TOKEN=' /opt/gtscdt/deploy/.env
-~~~
+1. 登录 YSCOT 工作台；
+2. 打开「个人信息」；
+3. 找到「MCP 接入令牌」，点「复制」；
+4. 如果怀疑泄露，点「重置」——旧 token 立即失效，再把新 token 填回 MCP 客户端。
 
-本地开发可以在启动前设置：
+规则：
 
-~~~bash
-export MCP_TOKEN='本地自定义一个长随机串'
-node templates/server.mjs
-~~~
+- 每个讲师一个 token，只对**自己的场次**生效；管理员 token 可看全部；
+- token 只显示给当前登录账号，不要写进前端、仓库或发群；
+- 重置不需要重启服务，调用立即生效；
+- 令牌丢了直接重置，不需要找回旧值。
 
 请求头固定为：
 
 ~~~http
-Authorization: Bearer <MCP_TOKEN>
+Authorization: Bearer <你的个人 token>
 Content-Type: application/json
 ~~~
-
 ## 三、客户端配置
 
 通用 MCP HTTP 客户端（字段名以你的客户端为准）：
@@ -223,7 +222,7 @@ base64 文件（≤ 10MB）：
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
-| `401 unauthorized` | 没带 token / token 不匹配 | 检查 `Authorization: Bearer ...`；确认是当前环境 `MCP_TOKEN` |
+| `401 unauthorized` | 没带 token / token 不匹配 / 已被重置 | 检查 `Authorization: Bearer ...`；到「个人信息」重新复制；确认没有在别处重置过 |
 | 浏览器打开是一页 HTML | 这是接入说明，不是报错 | 用 POST JSON-RPC 调用 |
 | `405` | 用了 GET 或 PUT | 改为 POST；请求体是 JSON-RPC |
 | `-32600 / Invalid Request` | JSON 不合法或缺 `jsonrpc/method` | 用 `initialize` / `tools/list` / `tools/call` |
