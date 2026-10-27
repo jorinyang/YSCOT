@@ -48,7 +48,7 @@ body{animation:pageIn .32s ease both}
 <link rel="stylesheet" href="/dialog.css" />
 </head><body>
 <div class="top"><div class="brand">弈策AI研究院 × 弈策课程运营系统 · 课堂后台</div>
-<div class="links"><a id="homeUser" href="/home" style="display:inline-flex;align-items:center;gap:6px;font-size:12px"></a><span class="pill" id="roomPill">ROOM0</span><a href="#" id="lnkScreen" target="_blank">大屏</a><a href="#" id="lnkRemote" target="_blank">遥控器</a><a href="#" id="lnkJoin" target="_blank">学员入口</a><a data-nav="course" href="course.html">← 课件</a><a href="#hw" id="lnkHw">作业评分</a><a data-nav="promo" href="../index.html" target="_blank">宣传页</a></div></div>
+<div class="links"><a id="homeUser" href="/home" style="display:inline-flex;align-items:center;gap:6px;font-size:12px"></a><span class="pill" id="roomPill">ROOM0</span><a href="#" id="lnkScreen" target="_blank">大屏</a><a href="#" id="lnkRemote" target="_blank">遥控器</a><a href="#" id="lnkJoin" target="_blank">学员入口</a><a data-nav="course" href="course.html">← 课件</a><a href="#hw" id="lnkHw">作业评分</a></div></div>
 <div class="wrap">
   <h1>课堂页后台</h1>
   <p class="sub">投票发起与结果、抽签与分组管理、课堂表现加减分。学员手机页会自动刷新。<span id="svc" class="pill">连接中…</span></p>
@@ -61,6 +61,7 @@ body{animation:pageIn .32s ease both}
   <div id="pane-class"><div class="grid2">
     <div class="card">
       <div class="k">投票题库（遥控器从这里选）</div>
+      <div class="muted small" style="margin:-2px 0 10px">只用于遥控器投票；在线答题题库在「在线答题」Tab 单独导入，两套不共用。</div>
       <div id="vpList" class="small"></div>
       <div class="rowflex" style="margin-top:10px"><input id="vpQ" placeholder="问题，例如：你从什么时候开始接触 AI？" style="width:100%" /></div>
       <textarea id="vpOpts" rows="4" placeholder="选项，每行一个" style="margin-top:6px;width:100%"></textarea>
@@ -135,6 +136,7 @@ body{animation:pageIn .32s ease both}
   </div>
 </div><div id="pane-quiz" class="hidden"><div class="card" style="margin-top:14px">
     <div class="k">在线答题</div>
+      <div class="muted small" style="margin:-2px 0 10px">答题题库独立：先下载模板/导入题库；投票题不会自动进入答题。</div>
     <div class="rowflex" style="gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn sm ghost" id="quizTpl">下载导入模板</button>
       <label class="btn sm" style="cursor:pointer">导入题库（.xlsx）<input type="file" id="quizFile" accept=".xlsx,.xls" style="display:none" /></label>
@@ -184,8 +186,19 @@ body{animation:pageIn .32s ease both}
 <script src="/dialog.js"></script>
 <script>
 var API=(window.YSCOT_API||'');
-var _xlsxLoading=false;
-function loadXLSX(){ if(_xlsxLoading||window.XLSX)return; _xlsxLoading=true; var s=document.createElement('script'); s.src='../xlsx.full.min.js'; s.onload=function(){_xlsxLoading=false}; s.onerror=function(){_xlsxLoading=false}; document.head.appendChild(s); }
+var _xlsxPromise=null;
+function ensureXLSX(){
+  if(window.XLSX) return Promise.resolve();
+  if(_xlsxPromise) return _xlsxPromise;
+  _xlsxPromise=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='../xlsx.full.min.js';
+    s.onload=function(){ window.XLSX?resolve():reject(new Error('XLSX 未初始化')) };
+    s.onerror=function(){ reject(new Error('XLSX 加载失败')) };
+    document.head.appendChild(s);
+  });
+  return _xlsxPromise;
+}
 function fmt(n){return n==null?'—':n}
 async function api(p,opt){
   var r=await fetch(API+p,opt||{});
@@ -305,8 +318,8 @@ function bind(){
     await post('/api/admin/groupdel',{id:id}); refresh();
   })});
   var tf=document.getElementById('quizTpl');
-  if(tf)tf.addEventListener('click',function(){
-    if(!window.XLSX){loadXLSX();alert('表格组件正在加载，请稍后再点一次');return}
+  if(tf)tf.addEventListener('click',async function(){
+    try{ await ensureXLSX(); }catch(e){ alert('表格组件加载失败，请刷新页面后重试'); return; }
   var wb=XLSX.utils.book_new();
     function add(name,header,sample){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([header,sample]),name)}
     add('选择题',['题目','答案A','答案B','答案C','答案D','正确答案'],['例如：中华人民共和国成立于哪一年？','1949 年','1950 年','1948 年','1951 年','A']);
@@ -319,8 +332,8 @@ function bind(){
   if(qf)qf.addEventListener('change',async function(){
     var f=qf.files&&qf.files[0]; if(!f)return;
     try{
+      await ensureXLSX();
       var buf=await f.arrayBuffer();
-      if(!window.XLSX){loadXLSX();alert('表格组件正在加载，请稍后再点一次');return}
   var wb=XLSX.read(buf,{type:'array'});
       function rows(name){
         var sh=wb.Sheets[name]||wb.Sheets[(wb.SheetNames||[]).filter(function(n){return n.indexOf(name)===0})[0]];
@@ -490,6 +503,7 @@ refresh();setInterval(refresh,2500);
   };
   document.getElementById('cardAdd').onclick=function(){ var theme=document.getElementById('cardTheme').value.trim(); if(!theme){document.getElementById('cardMsg').textContent='主题必填';return} post('/api/admin/cards',{action:'add',theme:theme,type:document.getElementById('cardType').value,content:document.getElementById('cardContent').value,attrs:document.getElementById('cardAttrs').value}).then(function(d){ if(d.ok){document.getElementById('cardTheme').value='';document.getElementById('cardContent').value='';document.getElementById('cardAttrs').value='';document.getElementById('cardMsg').textContent='已添加';load();}else document.getElementById('cardMsg').textContent=d.error||'失败'; }); };
   setInterval(load,4000); load();
+  setTimeout(function(){ ensureXLSX().catch(function(){}) },500);
   fetch('/api/me',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
     var el=document.getElementById('homeUser'); if(!el||!d.teacher)return;
     var t=d.teacher; el.innerHTML=(t.avatar?'<img src="'+t.avatar+'" style="width:24px;height:24px;border-radius:50%;object-fit:cover" />':'<span style="width:24px;height:24px;border-radius:50%;background:rgba(217,138,43,.25);display:inline-block;text-align:center;line-height:24px">'+(t.name||'?').slice(0,1)+'</span>')+'<span>'+(t.name||'讲师')+'</span>';

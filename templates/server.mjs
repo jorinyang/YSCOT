@@ -213,6 +213,75 @@ function mcpToolDefs(){
 
   ];
 }
+function mcpHelpHtml(){
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YSCOT MCP 接入说明</title><style>
+  :root{--bg:#0e0e10;--card:#17171b;--line:#2b2b32;--text:#f4efe2;--muted:#9db3a6;--lime:#cbf74e}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.7 -apple-system,"Microsoft YaHei",sans-serif}
+  main{max-width:900px;margin:0 auto;padding:48px 24px 80px}h1{font-size:30px;margin:0 0 8px}h2{font-size:18px;margin:30px 0 8px;color:var(--lime)}
+  p,li{color:#d8d2c5}small,.muted{color:var(--muted)}code{background:#22231f;color:#e7f9a6;border-radius:5px;padding:2px 5px}
+  pre{background:#111216;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;color:#dce9c4;font:12.5px/1.6 Consolas,monospace}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:18px 0}.warn{border-color:rgba(203,247,78,.45);background:rgba(203,247,78,.07)}
+  a{color:var(--lime)}table{width:100%;border-collapse:collapse;margin-top:8px}td,th{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:500}
+  </style></head><body><main>
+  <h1>YSCOT MCP 接入说明</h1>
+  <p class="muted">这里是 MCP JSON-RPC 端点，不是普通网页。浏览器直接打开看到这一段是正常的；AI 客户端应使用 POST 请求。</p>
+  <div class="card warn"><b>先看这一条：401 unauthorized 不是服务坏了。</b><br>需要在请求头带 <code>Authorization: Bearer &lt;MCP_TOKEN&gt;</code>。令牌只放在服务端 <code>deploy/.env</code> 的 <code>MCP_TOKEN</code>，不要写进前端，也不要发给外部。</div>
+  <h2>1. 客户端配置（通用 MCP HTTP）</h2>
+  <pre>{
+  "mcpServers": {
+    "yscot": {
+      "type": "http",
+      "url": "https://yscot.clawshell.online/mcp",
+      "headers": {
+        "Authorization": "Bearer &lt;MCP_TOKEN&gt;"
+      }
+    }
+  }
+}</pre>
+  <p class="muted">不同客户端的字段名可能略有差异；核心只有两个：URL 和 Authorization 请求头。</p>
+  <h2>2. 先用 curl 验证</h2>
+  <pre>export MCP_TOKEN='从服务器 deploy/.env 取'
+curl -s https://yscot.clawshell.online/mcp \
+  -X POST \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
+  <p>返回里有 <code>"tools":[ ... ]</code> 就说明令牌和端点都通了。</p>
+  <h2>3. 调用一个工具</h2>
+  <pre>{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "votebank.put",
+    "arguments": {
+      "room": "YQ2X",
+      "mode": "append",
+      "presets": [
+        {"question": "你从什么时候开始接触 AI？", "options": ["今天第一次", "半年内", "一到三年", "三年以上"]}
+      ]
+    }
+  }
+}</pre>
+  <h2>4. 常用内容工具</h2>
+  <table><tr><th>工具</th><th>用途</th><th>关键参数</th></tr>
+  <tr><td><code>votebank.put</code></td><td>遥控器投票题库</td><td><code>room, mode, presets[{question,options}]</code></td></tr>
+  <tr><td><code>material.put</code></td><td>课程素材</td><td><code>room, name, data_base64</code> 或 <code>url</code></td></tr>
+  <tr><td><code>card.put</code></td><td>行动卡 / 场景卡</td><td><code>room, theme, type, content, attrs</code></td></tr>
+  <tr><td><code>rubric.put</code></td><td>作业评分标准</td><td><code>room, task(T1-T6), items[{t,pts,desc}]</code></td></tr>
+  <tr><td><code>quiz.publish</code></td><td>按已有答题题库发布</td><td><code>room, mode(random/seq), counts, scores</code></td></tr>
+  </table>
+  <h2>5. 常见错误</h2>
+  <table><tr><th>现象</th><th>处理</th></tr>
+  <tr><td>401 unauthorized</td><td>检查 Bearer 令牌是否来自当前环境、是否多了空格；不要用浏览器 GET 代替 POST。</td></tr>
+  <tr><td>工具返回“题库为空”</td><td>先导入 <code>votebank.put</code> 或后台「在线答题」题库；投票题和答题题库不是同一份数据。</td></tr>
+  <tr><td>找不到房间</td><td><code>room</code> 必须是 4 位大写场次码，例如 <code>YQ2X</code>。</td></tr>
+  <tr><td>素材超过大小</td><td>单个素材 ≤ 10MB；MCP 请求体 ≤ 16MB，建议大文件走 <code>url</code> 外链。</td></tr>
+  </table>
+  <p class="muted">完整字段与返回示例：<a href="https://github.com/jorinyang/YSCOT/blob/main/docs/09-MCP内容导入标准.md">docs/09-MCP内容导入标准.md</a></p>
+  </main></body></html>`;
+}
+
 async function mcpHandle(msg){
   const id=(msg&&msg.id!==undefined)?msg.id:null;
   const method=msg&&msg.method;
@@ -556,9 +625,13 @@ const server=http.createServer(async (req,res)=>{
   }
   if(p==='/embed') return send(res,200,fs.readFileSync(path.join(__dirname,'embed.html')),'text/html; charset=utf-8');
   if(p==='/mcp'){
+    if(req.method!=='POST'){
+      if(req.method==='GET'){ res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); return res.end(mcpHelpHtml()); }
+      return send(res,405,{jsonrpc:'2.0',error:{code:-32600,message:'MCP 只接受 POST JSON-RPC'},id:null});
+    }
     if(process.env.MCP_TOKEN){
       const auth=String(req.headers.authorization||'');
-      if(auth!=='Bearer '+process.env.MCP_TOKEN) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized'},id:null});
+      if(auth!=='Bearer '+process.env.MCP_TOKEN) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized: 需要 Authorization: Bearer <MCP_TOKEN>，使用 POST JSON-RPC'},id:null});
     }
     const body=await readBody(req,16*1024*1024);
     const reply=await mcpHandle(body);

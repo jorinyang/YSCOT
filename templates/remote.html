@@ -47,7 +47,8 @@ input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(
 </div>
 
 <div class="card"><div class="k">投票</div>
-  <select id="presetSel" style="margin-bottom:8px"></select>
+  <select id="presetSel" style="width:100%;margin-bottom:6px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#141619;color:var(--text);font-size:14px"></select>
+  <div class="muted small" id="presetHint" style="margin-bottom:8px;line-height:1.5">只用于投票；在线答题题库在「课堂后台 → 在线答题」单独导入。</div>
   <button class="btn wide" id="presetStart">开始投票</button>
   <button class="btn wide" id="pollStop">结束投票</button>
   <div class="muted small" id="pollStat">未进行</div>
@@ -109,7 +110,7 @@ function refresh(){api('/api/admin/state').then(function(d){
   var cs=document.getElementById('cardSel'); var cur=cs.value;
   cs.innerHTML='<option value="">（选择行动卡/场景卡）</option>'+(d.cards||[]).map(function(c){return '<option value="'+c.id+'">'+c.theme+' · '+c.type+'</option>'}).join('');
   if(cur)cs.value=cur;
-}).catch(function(){})}
+}).catch(function(){}); loadPresets(); }
 document.getElementById('rollStop').onclick=function(){post('/api/admin/roll',{action:'stop'}).then(refresh)};
 document.getElementById('rollStart').onclick=function(){post('/api/admin/roll',{action:'start'}).then(function(d){ if(d&&d.ok===false)alert(d.error||'点名失败'); refresh(); })};
 document.getElementById('pollStop').onclick=function(){post('/api/admin/poll',{action:'stop'}).then(refresh)};
@@ -121,14 +122,25 @@ document.getElementById('wsReset').onclick=function(){post('/api/admin/timer',{a
 document.getElementById('cardPush').onclick=function(){var id=document.getElementById('cardSel').value;if(!id){alert('先在课堂后台添加行动卡');return}post('/api/admin/cards',{action:'push',id:id}).then(refresh)};
 document.getElementById('cardWithdraw').onclick=function(){post('/api/admin/cards',{action:'withdraw'}).then(refresh)};
 document.getElementById('groupScores').addEventListener('click',function(e){var b=e.target.closest('[data-g]');if(!b)return;post('/api/admin/perf',{group:b.getAttribute('data-g'),delta:Number(b.getAttribute('data-d'))}).then(refresh)});
+var __presetSig='';
+function syncPresetButton(){
+  var sel=document.getElementById('presetSel'); var pb=document.getElementById('presetStart'); if(!pb||!sel)return;
+  var has=!!sel.value;
+  pb.disabled=!has;
+  pb.textContent=has?'开始投票':'先在课堂后台添加投票题';
+}
 function loadPresets(){
   post('/api/admin/votepreset',{action:'list'}).then(function(d){
     var sel=document.getElementById('presetSel'); var list=(d&&d.list)||[];
+    var sig=JSON.stringify(list); if(sig===__presetSig)return;
+    __presetSig=sig; window.__presets=list;
+    var cur=sel.value;
     sel.innerHTML='<option value="">（选择预置题目）</option>'+list.map(function(v){return '<option value="'+v.id+'">'+v.question+'</option>'}).join('');
-    window.__presets=list;
-    var pb=document.getElementById('presetStart'); if(pb){ if(!list.length){pb.disabled=true;pb.textContent='先在课堂后台添加预置题目'}else{pb.disabled=false;pb.textContent='开始投票'} }
+    if(list.length) sel.value=list.some(function(v){return v.id===cur})?cur:list[0].id;
+    syncPresetButton();
   }).catch(function(){});
 }
+document.getElementById('presetSel').onchange=syncPresetButton;
 document.getElementById('presetStart').onclick=function(){var id=document.getElementById('presetSel').value;var v=(window.__presets||[]).filter(function(x){return x.id===id})[0];if(!v){alert('先在课堂后台添加预置题目');return}post('/api/admin/poll',{action:'start',question:v.question,options:v.options}).then(refresh)};
 document.getElementById('quizStart').onclick=function(){post('/api/admin/quiz',{action:'startPreset'}).then(function(d){if(d&&d.ok===false)alert(d.error||'题库为空');refresh()})};
 document.getElementById('matToggle').onclick=function(){post('/api/admin/material',{open:!window.__mat}).then(refresh)};

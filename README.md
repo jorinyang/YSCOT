@@ -108,21 +108,46 @@ YSCOT 的判断是：**一堂课应该有一个统一的“房间”对象。** 
 
 | MCP 工具 | 导入什么 | 典型用途 |
 | --- | --- | --- |
-| `votebank.put` | 投票题库 | 课前把 5–10 道投票题放进遥控器 |
+| `votebank.put` | 投票题库（遥控器用） | 课前把 5–10 道投票题放进遥控器 |
 | `material.put` | 课程素材 | 案例、模板、阅读材料，学员端直接下载 |
 | `card.put` | 行动卡 / 场景卡 | 工作坊推进时投到大屏、推到学员手机 |
 | `rubric.put` | 作业评分标准 | 按 T1–T6 关卡配置评分点 |
 
-调用示例：
+### 三步接入
 
-~~~bash
-curl -X POST https://yscot.clawshell.online/mcp \
-  -H "Authorization: Bearer $MCP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"votebank.put","arguments":{"room":"ROOM0","mode":"append","presets":[{"question":"你从什么时候开始接触 AI？","options":["今天第一次","用过几次","每周都用"]}]}}}'
+1. **取令牌**：服务器 `deploy/.env` 里的 `MCP_TOKEN`；不要写进前端或仓库。
+2. **配客户端**：URL 用 `https://yscot.clawshell.online/mcp`，请求头带 `Authorization: Bearer <MCP_TOKEN>`。
+3. **先验证**：调用 `tools/list`，看到 `tools` 数组再开始写入。
+
+通用 MCP HTTP 客户端配置：
+
+~~~json
+{
+  "mcpServers": {
+    "yscot": {
+      "type": "http",
+      "url": "https://yscot.clawshell.online/mcp",
+      "headers": { "Authorization": "Bearer <MCP_TOKEN>" }
+    }
+  }
+}
 ~~~
 
-字段、示例、错误码和大小限制见 [MCP 内容导入标准](docs/09-MCP内容导入标准.md)。
+命令行验证：
+
+~~~bash
+curl -s https://yscot.clawshell.online/mcp \
+  -X POST \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+~~~
+
+> `/mcp` 不是普通网页，而是 **POST + JSON-RPC 2.0** 端点。浏览器直接打开会看到接入说明；不带 Bearer 会返回 `401 unauthorized`，这不是服务坏了。
+>
+> **投票题和在线答题题库是两套数据。** `votebank.put` 只影响遥控器投票；在线答题要先在后台「在线答题」导入题库，或用 MCP 写入答题题库后再 `quiz.publish`。
+
+完整客户端配置、`initialize` / `tools/call` 请求体、四类内容示例和排错表见 [MCP 接入与排错](docs/10-MCP接入与排错.md)；字段级标准见 [MCP 内容导入标准](docs/09-MCP内容导入标准.md)。
 
 ---
 
