@@ -75,7 +75,7 @@ function teacherByMcpToken(token){
   for(const id of Object.keys(tokens)){
     const rec=tokens[id]||{}; if(rec.token!==tok) continue;
     if(id==='local') return {id:'local',name:rec.name||'本地讲师',role:'admin'};
-    const t=loadTeachers().filter(function(x){return String(x.id)===id})[0];
+    const t=loadTeachers().filter(function(x){return String(x.id)===id||String(x.dingUnionId)===id||String(x.dingUserId)===id})[0];
     return t?Object.assign({},t,{id:id}):null;
   }
   return null;
