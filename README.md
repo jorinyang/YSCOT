@@ -29,15 +29,15 @@ YSCOT 是一个面向企业 AI 培训现场的 **课堂运营系统**。它不�
 
 ---
 
-## 16 秒看懂
+## 演示：一节课怎么跑
 
 <p align="center">
-  <a href="docs/images/demo.mp4"><img src="docs/images/demo.gif" width="86%" alt="YSCOT 功能演示：场次入口、课堂内容、后台、遥控器、大屏和学员端" /></a>
+  <a href="docs/images/demo.mp4"><img src="docs/images/demo.gif" width="86%" alt="YSCOT 动效演示：场次入口、课程内容、后台、遥控器、大屏和学员端" /></a>
 </p>
 
-<p align="center"><sub>场次入口 → 课程内容 → 课堂后台 → 遥控器 → 大屏 → 学员端　·　点击动图打开 MP4</sub></p>
+<p align="center"><sub>8 秒预览 · 42 秒完整演示　·　点击动图打开 MP4</sub></p>
 
-演示使用真实页面和演示房间，不含客户数据。
+演示不是截图轮播：鼠标移动、点击、Tab 切换、小组加分、随机点名、PPTX / HTML 翻页、工作坊倒计时和学员抽签都是真实交互录屏，再叠加章节卡和说明字幕。
 
 ---
 
@@ -325,7 +325,7 @@ docker run -d -p 8899:8899 \
 
 ## 架构
 
-<img src="docs/images/architecture-v4.png" alt="YSCOT 系统架构：浏览器四端、Node 课堂服务、房间状态、课件素材、MCP 与模型 API" width="100%" />
+<img src="docs/images/architecture-v3.svg" alt="YSCOT 全景架构：场次入口、四端、课程内容、大屏课件、Node 服务、房间状态、素材、MCP 与模型 API" width="100%" />
 
 **这张图想说明三件事：**
 
@@ -333,7 +333,7 @@ docker run -d -p 8899:8899 \
 2. **Node 单进程是课堂的调度中心**：零依赖 HTTP 服务同时提供页面、API、SSE 和 MCP；
 3. **内容和外部能力在两侧**：房间 JSON + 课件 / 素材是本地持久化；MCP 和模型 API 是可选的外部写入 / 评分能力。
 
-> 更细的端能力清单保留在 [旧版端能力全景](docs/images/architecture-v3.svg)，适合查某一个按钮属于哪个端；上面的 v4 图更适合第一次理解系统边界。
+> 这张全景图补全了三个容易漏掉的视角：场次入口 `/room`、课程内容 `/room-setup`、课件大屏 `/course-screen`。要查某个按钮属于哪个端，也看这张。
 
 ### 设计取舍
 
