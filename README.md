@@ -122,7 +122,7 @@ YSCOT 的判断是：**一堂课应该有一个统一的“房间”对象。** 
 
 ### 三步接入
 
-1. **取令牌**：登录后打开「工作台 → 个人信息 → MCP 接入令牌」，复制自己的 token；每个讲师一套，可随时重置。
+1. **取令牌**：登录后打开「工作台 → 模型与MCP → MCP 接入令牌」，复制自己的 token；每个讲师一套，可随时重置。
 2. **配客户端**：URL 用 `https://yscot.clawshell.online/mcp`，请求头带 `Authorization: Bearer <个人 token>`。
 3. **先验证**：调用 `tools/list`，看到 `tools` 数组再开始写入。
 
@@ -394,7 +394,7 @@ YSCOT/
 │  ├─ server.mjs              房间 / 鉴权 / API / SSE / MCP
 │  ├─ ui.css                  全站主题（近黑 + 荧光绿 + 大圆角）
 │  ├─ login.html              分屏登录
-│  ├─ home.html               工作台：场次 / 模型 / 个人信息 / 讲师
+│  ├─ home.html               工作台：场次 / 模型与MCP / 个人信息 / 讲师
 │  ├─ room.html               场次入口：四端链接 + 二维码
 │  ├─ room-setup.html         课程内容：场次信息 / PPTX / HTML
 │  ├─ course/

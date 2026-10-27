@@ -16,7 +16,7 @@
 MCP 令牌在**讲师登录后的个人页面**生成和查看，不在服务器环境变量里手工配：
 
 1. 登录 YSCOT 工作台；
-2. 打开「个人信息」；
+2. 打开「模型与MCP」；
 3. 找到「MCP 接入令牌」，点「复制」；
 4. 如果怀疑泄露，点「重置」——旧 token 立即失效，再把新 token 填回 MCP 客户端。
 
@@ -276,7 +276,7 @@ MCP 除了导入内容，也能执行遥控器上的现场动作。语音 Agent 
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
-| `401 unauthorized` | 没带 token / token 不匹配 / 已被重置 | 检查 `Authorization: Bearer ...`；到「个人信息」重新复制；确认没有在别处重置过 |
+| `401 unauthorized` | 没带 token / token 不匹配 / 已被重置 | 检查 `Authorization: Bearer ...`；到「模型与MCP」重新复制；确认没有在别处重置过 |
 | 浏览器打开是一页 HTML | 这是接入说明，不是报错 | 用 POST JSON-RPC 调用 |
 | `405` | 用了 GET 或 PUT | 改为 POST；请求体是 JSON-RPC |
 | `-32600 / Invalid Request` | JSON 不合法或缺 `jsonrpc/method` | 用 `initialize` / `tools/list` / `tools/call` |

@@ -287,7 +287,7 @@ function mcpHelpHtml(){
   </style></head><body><main>
   <h1>YSCOT MCP 接入说明</h1>
   <p class="muted">这里是 MCP JSON-RPC 端点，不是普通网页。浏览器直接打开看到这一段是正常的；AI 客户端应使用 POST 请求。</p>
-  <div class="card warn"><b>先看这一条：401 unauthorized 不是服务坏了。</b><br>需要在请求头带 <code>Authorization: Bearer &lt;MCP_TOKEN&gt;</code>。登录后在工作台「个人信息」页的「MCP 接入令牌」里查看，可复制、可重置；只对当前讲师的场次生效，不要发给外部。</div>
+  <div class="card warn"><b>先看这一条：401 unauthorized 不是服务坏了。</b><br>需要在请求头带 <code>Authorization: Bearer &lt;MCP_TOKEN&gt;</code>。登录后在工作台「模型与MCP」页的「MCP 接入令牌」里查看，可复制、可重置；只对当前讲师的场次生效，不要发给外部。</div>
   <h2>1. 客户端配置（通用 MCP HTTP）</h2>
   <pre>{
   "mcpServers": {
@@ -302,7 +302,7 @@ function mcpHelpHtml(){
 }</pre>
   <p class="muted">不同客户端的字段名可能略有差异；核心只有两个：URL 和 Authorization 请求头。</p>
   <h2>2. 先用 curl 验证</h2>
-  <pre>export MCP_TOKEN='从工作台 → 个人信息 → MCP 接入令牌 复制'
+  <pre>export MCP_TOKEN='从工作台 → 模型与MCP → MCP 接入令牌 复制'
 curl -s https://yscot.clawshell.online/mcp \
   -X POST \
   -H "Authorization: Bearer $MCP_TOKEN" \
@@ -338,7 +338,7 @@ curl -s https://yscot.clawshell.online/mcp \
   </table>
   <h2>5. 常见错误</h2>
   <table><tr><th>现象</th><th>处理</th></tr>
-  <tr><td>401 unauthorized</td><td>到工作台「个人信息 → MCP 接入令牌」复制；检查是否被重置或多了空格；不要用浏览器 GET 代替 POST。</td></tr>
+  <tr><td>401 unauthorized</td><td>到工作台「模型与MCP → MCP 接入令牌」复制；检查是否被重置或多了空格；不要用浏览器 GET 代替 POST。</td></tr>
   <tr><td>工具返回“题库为空”</td><td>先导入 <code>votebank.put</code> 或后台「在线答题」题库；投票题和答题题库不是同一份数据。</td></tr>
   <tr><td>找不到房间</td><td><code>room</code> 必须是 4 位大写场次码，例如 <code>YQ2X</code>。</td></tr>
   <tr><td>素材超过大小</td><td>单个素材 ≤ 10MB；MCP 请求体 ≤ 16MB，建议大文件走 <code>url</code> 外链。</td></tr>
@@ -768,7 +768,7 @@ const server=http.createServer(async (req,res)=>{
     const bearer=auth.indexOf('Bearer ')===0?auth.slice(7).trim():'';
     let mcpTeacher=teacherByMcpToken(bearer);
     if(!mcpTeacher&&process.env.MCP_TOKEN&&bearer===process.env.MCP_TOKEN) mcpTeacher={id:'local',name:'服务令牌',role:'admin'};
-    if(!mcpTeacher) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized: 请使用工作台「个人信息 → MCP 接入令牌」里的个人 token，并放在 Authorization: Bearer 后'},id:null});
+    if(!mcpTeacher) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized: 请使用工作台「模型与MCP → MCP 接入令牌」里的个人 token，并放在 Authorization: Bearer 后'},id:null});
     const body=await readBody(req,16*1024*1024);
     const reply=await mcpHandle(body,mcpTeacher);
     return send(res,200,reply);
