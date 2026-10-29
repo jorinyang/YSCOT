@@ -264,6 +264,30 @@ function adminView(){
   const _mc=modelCfg();
   return {ok:true,timer:state.timer||null,workshopOpen:!!(state.config&&state.config.workshopOpen),quiz:quizInfo,model:{baseUrl:_mc.base,model:_mc.model,hasKey:!!_mc.key},config:state.config||{},groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),votePresets:state.votePresets||[],cards:state.cards||[],materials:state.materials||[],rubrics:state.rubrics||{},activeCard:(state.config&&state.config.activeCard)||'',activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===(state.config&&state.config.activeCard)})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null;})(),tasks:state.tasks||[],hwOpen:!!(state.config&&state.config.hwOpen),buzz:state.buzz||{enabled:false,running:false,winner:''},students:Object.keys(state.students).map(function(k){const st=Object.assign({key:k},state.students[k]);st.hwScore=Object.keys(state.submissions||{}).filter(function(sk){return sk.indexOf(k+'||')===0}).reduce(function(a,sk){return a+(((state.submissions[sk]||{}).score||{}).total||0)},0);st.quizScore=(((state.quiz&&state.quiz.answers&&state.quiz.answers[k])||{}).score)||0;st.individualScore=Math.round((st.hwScore+st.quizScore)*10)/10;return st}),groups:Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name,perf:state.groups[g].perf||0,count:counts[g]})),counts,roll:state.roll||{active:false},poll:{active:state.poll.active,question:state.poll.question,options:state.poll.options,votes:state.poll.votes,results,startedAt:state.poll.startedAt},submissions:subs,updatedAt:state.updatedAt};
 }
+/* 【JSON 解读模块·临时】解析考试结果 JSON，提取评分（总分/等级/姓名/提示次数/各题得分）。
+   通用字段名匹配（中/英），兼容不同 JSON 结构；解析不出的字段留 null，raw 保留原始 JSON。
+   与 AI+rubric 重新打分并存：本模块只读 JSON 已有分；AI 重评走 aiScoreSubmission 覆盖 sub.score，两者互不冲突。*/
+function parseExamJson(text){
+  let obj; try{ obj=JSON.parse(text); }catch(e){ return null; }
+  const out={ok:true,raw:obj,total:null,grade:null,name:null,hint:null,items:[],at:new Date().toLocaleString('zh-CN')};
+  const num=function(v){ return (typeof v==='number'&&isFinite(v))?v:null; };
+  (function walk(o){
+    if(!o||typeof o!=='object') return;
+    if(Array.isArray(o)){ o.forEach(walk); return; }
+    const sc0=(o.score!=null)?num(o.score):(o.pts!=null)?num(o.pts):(o.得分!=null)?num(o.得分):(o.point!=null)?num(o.point):null;
+    const tt0=(o.t!=null)?o.t:(sc0!==null&&o.name!=null)?o.name:(sc0!==null&&o.id!=null)?o.id:(sc0!==null&&o.title!=null)?o.title:(sc0!==null&&o.task!=null)?o.task:(o.dim!=null)?o.dim:(o.题目!=null)?o.题目:(o.维度!=null)?o.维度:null;
+    if(sc0!==null&&tt0!==null&&out.items.length<40) out.items.push({t:String(tt0),score:sc0,desc:o.desc||o.说明||o.reason||''});
+    for(const k in o){
+      const v=o[k]; const key=String(k).toLowerCase();
+      if(out.total===null&&/^(total|totalscore|finalscore|final|score|sum|zongfen|总分|总成绩|得分)$/.test(key)&&num(v)!==null) out.total=num(v);
+      if(out.grade===null&&/^(grade|level|band|档次|等级|评级)$/.test(key)&&typeof v==='string') out.grade=v;
+      if(out.name===null&&/^(name|姓名|考生|student|candidate|username|用户)$/.test(key)&&typeof v==='string') out.name=v;
+      if(out.hint===null&&/^(hint|hints|hintcount|usehints|tips|提示次数)$/.test(key)&&num(v)!==null) out.hint=num(v);
+      walk(v);
+    }
+  })(obj);
+  return out;
+}
 async function aiScoreSubmission(sub,rubric,taskName){
   if(!sub) return {ok:false,error:'submission not found'};
   if(!rubric||!rubric.length) return {ok:false,error:'缺少评分标准'};
@@ -1283,7 +1307,7 @@ const server=http.createServer(async (req,res)=>{
       if(p==='/api/admin/state') return send(res,200,adminView());
         if(p==='/api/report'){
           const students=Object.keys(state.students).map(k=>Object.assign({key:k},state.students[k]));
-          const subs=Object.keys(state.submissions).map(k=>{const p2=k.split('||');const st=state.students[p2[0]]||{};const sub=state.submissions[k];return {name:st.name||p2[0],tail:st.tail||'',task:p2[1],total:(sub.score&&sub.score.total)||0,at:sub.at}});
+          const subs=Object.keys(state.submissions).map(k=>{const p2=k.split('||');const st=state.students[p2[0]]||{};const sub=state.submissions[k];return {name:st.name||p2[0],tail:st.tail||'',task:p2[1],total:(sub.score&&sub.score.total)||0,grade:(sub.score&&sub.score.grade)||'',source:(sub.score&&sub.score.source)||'',at:sub.at}});
           const byTask={}; subs.forEach(x=>{byTask[x.task]=(byTask[x.task]||0)+1});
           const quiz=state.quiz||{};
           const answers=Object.keys(quiz.answers||{}).map(k=>{const a=quiz.answers[k];return {key:k,score:a.score,total:a.total,at:a.at}});
@@ -1356,6 +1380,8 @@ const server=http.createServer(async (req,res)=>{
           sub.files=sub.files||[];sub.files.push({name:fn,size:buf.length,path:fname,at:new Date().toLocaleString('zh-CN')});
           if(/\.(md|txt)$/i.test(fn)&&!sub.text)sub.text=buf.toString('utf8').slice(0,6000);
           if(/\.(html?|docx|pptx|pdf|xlsx)$/i.test(fn)){ try{ const _txt=extractText(fn,buf).trim(); if(_txt)sub.text=_txt.slice(0,8000); }catch(e){} }
+          /* 考试结果 JSON：解析评分存 sub.jsonScore（解读存档）；无 AI 评分时用它填 sub.score 让前端直接显示 */
+          if(/\.json$/i.test(fn)){ try{ const _je=parseExamJson(buf.toString('utf8')); if(_je){ sub.jsonScore=_je; if(_je.total!==null) sub.score={source:'json',ai:false,total:_je.total,override:_je.total,items:_je.items,grade:_je.grade,at:_je.at}; } }catch(e){} }
           sub.at=new Date().toLocaleString('zh-CN');
           state.submissions[key]=sub;state.updatedAt=new Date().toISOString();save();
           return send(res,200,{ok:true,files:sub.files,batch:sub.batch});
@@ -1610,4 +1636,4 @@ const server=http.createServer(async (req,res)=>{
   serveStatic(res,p);
 });
 function lanIPs(){ const out=[]; const nets=os.networkInterfaces(); for(const n of Object.keys(nets)){ for(const a of nets[n]||[]){ if(a.family==='IPv4'&&!a.internal) out.push(a.address); } } return out; }
-server.listen(PORT,'0.0.0.0',()=>{ console.log('camp server on http://0.0.0.0:'+PORT); console.log('LAN: '+lanIPs().map(ip=>'http://'+ip+':'+PORT).join('  ')); console.log('ROOT='+ROOT); });
+server.listen(PORT,'0.0.0.0',4096,()=>{ console.log('camp server on http://0.0.0.0:'+PORT); console.log('LAN: '+lanIPs().map(ip=>'http://'+ip+':'+PORT).join('  ')); console.log('ROOT='+ROOT); });
