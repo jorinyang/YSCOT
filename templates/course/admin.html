@@ -48,7 +48,7 @@ body{animation:pageIn .32s ease both}
 <link rel="stylesheet" href="/dialog.css" />
 </head><body>
 <div class="top"><div class="brand">弈策AI研究院 × 弈策课程运营系统 · 课堂后台</div>
-<div class="links"><a id="homeUser" href="/home" style="display:inline-flex;align-items:center;gap:6px;font-size:12px"></a><span class="pill" id="roomPill">ROOM0</span><a href="#" id="lnkScreen" target="_blank">大屏</a><a href="#" id="lnkRemote" target="_blank">遥控器</a><a href="#" id="lnkJoin" target="_blank">学员入口</a><a data-nav="course" href="course.html">← 课件</a><a href="#hw" id="lnkHw">作业评分</a></div></div>
+<div class="links"><a id="homeUser" href="/home" style="display:inline-flex;align-items:center;gap:6px;font-size:12px"></a><a class="pill" id="lnkRoom" href="#" target="_blank" rel="noopener" title="打开场次入口：大屏 / 遥控器 / 学员入口 / 课程 / 作业">课程房间 <span id="roomCode">ROOM0</span></a></div></div>
 <div class="wrap">
   <h1>课堂页后台</h1>
   <p class="sub">投票发起与结果、抽签与分组管理、课堂表现加减分。学员手机页会自动刷新。<span id="svc" class="pill">连接中…</span></p>
@@ -210,9 +210,8 @@ var state=null,editingKey=null;
 var _rm=(document.cookie.match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/)||[])[1];
 var ROOM=(new URLSearchParams(location.search).get('room')||_rm||'ROOM0').toUpperCase();
 (function(){var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0&&u.indexOf('room=')<0)u+=(u.indexOf('?')>=0?'&':'?')+'room='+encodeURIComponent(ROOM);return f(u,o)}})();
-var rp=document.getElementById('roomPill'); if(rp)rp.textContent='房间 '+ROOM;
-var lk=function(id,path){var el=document.getElementById(id); if(el)el.href=path+'?room='+ROOM};
-lk('lnkScreen','/screen'); lk('lnkRemote','/remote'); lk('lnkJoin','/join');
+var rc=document.getElementById('roomCode'); if(rc)rc.textContent=ROOM;
+var lr=document.getElementById('lnkRoom'); if(lr)lr.href='/room?code='+ROOM;
 function render(){
   if(!state) return;
   var p=state.poll||{};
