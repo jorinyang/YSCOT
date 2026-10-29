@@ -699,6 +699,12 @@ function extractText(filename,buf){
   if(ext==='docx'){ const e=zipRead(buf); const d=e.filter(function(x){return x.name==='word/document.xml'})[0]; if(!d)throw new Error('docx 缺少正文'); return xmlText(zipEntry(buf,d).toString('utf8')); }
   if(ext==='pptx'){ const e=zipRead(buf); const slides=e.filter(function(x){return /^ppt\/slides\/slide\d+\.xml$/.test(x.name)}).sort(function(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true})}); if(!slides.length)throw new Error('pptx 缺少页面'); return slides.map(function(s,i){return '第 '+(i+1)+' 页\n'+xmlText(zipEntry(buf,s).toString('utf8'))}).join('\n\n'); }
   if(ext==='pdf'){ const r=spawnSync('pdftotext',['-','-'],{input:buf}); if(r.error||r.status!==0) throw new Error('服务器未安装 pdftotext，暂不能解析 PDF'); return String(r.stdout||'').trim(); }
+  if(ext==='xlsx'){
+    const e=zipRead(buf);
+    const parts=e.filter(function(x){return x.name==='xl/sharedStrings.xml'||/^xl\/worksheets\/sheet\d+\.xml$/.test(x.name)}).sort(function(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true})});
+    if(!parts.length) throw new Error('xlsx 缺少工作表');
+    return parts.map(function(x){return xmlText(zipEntry(buf,x).toString('utf8'))}).join('\n').trim();
+  }
   return buf.toString('utf8');
 }
 function renderQuestsPage(tasks){ return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><style>body{background:#081813;color:#F4EFE2;font-family:-apple-system,"PingFang SC",sans-serif;padding:16px}.qcard{border:1px solid rgba(244,239,226,.13);border-radius:12px;padding:14px;margin-bottom:10px}.qcard b{color:#F6E4C6}.qcard p,.qcard li{font-size:14px;color:#DDE6DE;line-height:1.7}.qcard ul{margin:6px 0 0 18px}.m{font-size:12px;color:#9DB3A6;margin-top:6px}</style></head><body>'+renderQuests(tasks)+'</body></html>'; }
@@ -1309,7 +1315,7 @@ const server=http.createServer(async (req,res)=>{
           sub.batch=batch||sub.batch||'';
           sub.files=sub.files||[];sub.files.push({name:fn,size:buf.length,path:fname,at:new Date().toLocaleString('zh-CN')});
           if(/\.(md|txt)$/i.test(fn)&&!sub.text)sub.text=buf.toString('utf8').slice(0,6000);
-          if(/\.(html?|docx|pptx|pdf)$/i.test(fn)){ try{ const _txt=extractText(fn,buf).trim(); if(_txt)sub.text=_txt.slice(0,8000); }catch(e){} }
+          if(/\.(html?|docx|pptx|pdf|xlsx)$/i.test(fn)){ try{ const _txt=extractText(fn,buf).trim(); if(_txt)sub.text=_txt.slice(0,8000); }catch(e){} }
           sub.at=new Date().toLocaleString('zh-CN');
           state.submissions[key]=sub;state.updatedAt=new Date().toISOString();save();
           return send(res,200,{ok:true,files:sub.files,batch:sub.batch});
