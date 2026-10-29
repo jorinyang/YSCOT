@@ -1309,6 +1309,7 @@ const server=http.createServer(async (req,res)=>{
           sub.batch=batch||sub.batch||'';
           sub.files=sub.files||[];sub.files.push({name:fn,size:buf.length,path:fname,at:new Date().toLocaleString('zh-CN')});
           if(/\.(md|txt)$/i.test(fn)&&!sub.text)sub.text=buf.toString('utf8').slice(0,6000);
+          if(/\.(html?|docx|pptx|pdf)$/i.test(fn)){ try{ const _txt=extractText(fn,buf).trim(); if(_txt)sub.text=_txt.slice(0,8000); }catch(e){} }
           sub.at=new Date().toLocaleString('zh-CN');
           state.submissions[key]=sub;state.updatedAt=new Date().toISOString();save();
           return send(res,200,{ok:true,files:sub.files,batch:sub.batch});
