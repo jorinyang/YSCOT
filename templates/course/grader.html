@@ -61,6 +61,7 @@ body{animation:pageIn .32s ease both}
     <div class="rowflex">
       <button class="btn" id="refresh">刷新</button>
       <button class="btn ghost" id="exportBtn">导出 CSV</button>
+      <button class="btn" id="aiRescore">AI 重评全部</button>
       <button class="btn ghost" id="critBtn">评分标准</button>
       <button class="btn danger" id="resetAll">清空全部提交</button>
     </div>
@@ -207,7 +208,7 @@ function openSubmission(key){
       b.disabled=true; b.textContent='评分中…';
       var rubric=(tt.crit||[]).map(function(c){return {t:c[0],pts:c[1],desc:c[2]}});
       try{
-        var r=await fetch(API+'/api/admin/scoreai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:curKey,rubric:rubric})});
+        var r=await fetch(API+'/api/admin/scoreai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:curKey,rubric:rubric,task:tt.name})});
         var d=await r.json();
         if(!d.ok){alert('AI 评分失败：'+(d.error||''));b.disabled=false;b.textContent='AI 评分';return}
         await refresh(); openSubmission(curKey);
@@ -233,6 +234,24 @@ function renderCrit(){
   }).join('');
 }
 
+var aiRescore=$('aiRescore');
+if(aiRescore)aiRescore.addEventListener('click',async function(){
+  var items=((st&&st.submissions)||[]).map(function(x){
+    var t=taskOf(x.task); if(!t)return null;
+    return {key:x.key,task:t.name,rubric:(t.crit||[]).map(function(c){return {t:c[0],pts:c[1],desc:c[2]}})};
+  }).filter(Boolean);
+  if(!items.length){alert('还没有可重评的提交');return}
+  if(!confirm('用模型按六个场景的通用标准重评 '+items.length+' 条提交？会覆盖现有模型分。'))return;
+  aiRescore.disabled=true;aiRescore.textContent='重评中…';
+  try{
+    var r=await fetch(API+'/api/admin/rescore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items})});
+    var d=await r.json();
+    if(!d.ok){alert('重评失败：'+(d.error||''));return}
+    alert('已重评 '+d.scored+' 条'+(d.failed&&d.failed.length?('；失败 '+d.failed.length+' 条：'+d.failed[0].error):'')+(d.remaining?('；还剩 '+d.remaining+' 条，可再次点击'):''));
+    await refresh();
+  }catch(e){alert('重评失败：'+e.message)}
+  finally{aiRescore.disabled=false;aiRescore.textContent='AI 重评全部'}
+});
 $('refresh').addEventListener('click',refresh);
 $('closeDetail').addEventListener('click',function(){$('detailCard').style.display='none'});
 $('critBtn').addEventListener('click',function(){var c=$('critCard');c.style.display=c.style.display==='none'?'block':'none'});

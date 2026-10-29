@@ -143,6 +143,8 @@ body{animation:pageIn .32s ease both}
       <span class="muted small" id="quizBank">题库：0 / 0 / 0 / 0</span>
       <button class="btn sm danger" id="quizResetBank">清空题库</button>
     </div>
+    <div class="rowflex" style="margin-top:8px"><textarea id="quizGenSrc" rows="2" placeholder="粘贴课程大纲/素材，AI 生成 15 道随堂题（选择8/判断4/填空2/简答1）" style="width:100%"></textarea></div>
+    <div class="rowflex" style="margin-top:6px;align-items:center"><button class="btn sm" id="quizGen">AI 生成题库</button><span class="muted small" id="quizGenMsg"></span></div>
     <div class="rowflex" style="gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center">
       <span class="muted small">出题方式</span>
       <select id="quizMode" style="padding:4px 8px"><option value="random">随机（每人不同）</option><option value="seq">顺序（统一卷）</option></select>
@@ -355,6 +357,20 @@ function bind(){
       refresh();
     }catch(e){alert('导入失败：'+(e.message||e))}
     qf.value='';
+  });
+  var qg=document.getElementById('quizGen');
+  if(qg)qg.addEventListener('click',async function(){
+    var src=(document.getElementById('quizGenSrc').value||'').trim();
+    if(!src){alert('先粘贴课程大纲或素材');return}
+    if(!confirm('根据这段内容生成 15 道题并追加到题库？'))return;
+    var btn=qg;btn.disabled=true;btn.textContent='生成中…';
+    document.getElementById('quizGenMsg').textContent='模型生成中，请稍候…';
+    try{
+      var d=await post('/api/admin/quizgen',{source:src});
+      document.getElementById('quizGenMsg').textContent='已追加：选 '+d.added.choice+' / 判 '+d.added.judge+' / 填 '+d.added.blank+' / 简 '+d.added.short;
+      await refresh();
+    }catch(e){alert('生成失败：'+(e.message||e));document.getElementById('quizGenMsg').textContent=''}
+    finally{btn.disabled=false;btn.textContent='AI 生成题库'}
   });
   var qp=document.getElementById('quizPublish');
   if(qp)qp.addEventListener('click',async function(){

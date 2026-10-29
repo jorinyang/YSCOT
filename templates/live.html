@@ -260,9 +260,9 @@ $('quizSubmit').addEventListener('click',async function(){
 $('buzzBtn').addEventListener('click',async function(){
   if(!stateData||!stateData.buzz||!stateData.buzz.running)return;
   try{
-    var r=await fetch(API+'/api/buzz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:me.name,tail:me.tail})});
+    var r=await fetch(API+'/api/buzz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:me.name,tail:me.tail,round:(stateData.buzz&&stateData.buzz.round)||0})});
     var d=await r.json();
-    if(d.ok&&d.winner){$('buzzMsg').textContent=(d.winner===me.name)?'你抢到了！':'已被 '+d.winner+' 抢到';$('buzzBtn').className='buzzbtn done';$('buzzBtn').disabled=true;}
+    if(d.ok&&d.winner){var mine=(d.won!==undefined?d.won:d.winner===me.name);$('buzzMsg').textContent=mine?'你抢到了！':'已被 '+d.winner+' 抢到';$('buzzBtn').className='buzzbtn done';$('buzzBtn').disabled=true;}
   }catch(e){}
   await refresh();
 });
@@ -272,10 +272,11 @@ $('hwConfirm').addEventListener('click',async function(){
   if(!confirm('确认提交以下 '+pending.length+' 个文件？\n\n'+names+'\n\n提交后讲师后台立即可见。'))return;
   var btn=$('hwConfirm');btn.disabled=true;btn.textContent='提交中…';
   var fails=0;
+  var batch=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   for(var i=0;i<pending.length;i++){
     var x=pending[i];
     try{
-      var r=await fetch(API+'/api/upload?name='+encodeURIComponent(me.name)+'&tail='+encodeURIComponent(me.tail)+'&task='+x.task+'&filename='+encodeURIComponent(x.file.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:x.file});
+      var r=await fetch(API+'/api/upload?name='+encodeURIComponent(me.name)+'&tail='+encodeURIComponent(me.tail)+'&task='+x.task+'&filename='+encodeURIComponent(x.file.name)+'&batch='+encodeURIComponent(batch),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:x.file});
       if(!r.ok)throw new Error('HTTP '+r.status);
     }catch(e){fails++;}
   }
