@@ -270,7 +270,8 @@ function mcpToolDefs(){
     {name:'card.put',description:'导入行动卡或场景卡；带 id 为更新，不带为新增。',inputSchema:{type:'object',properties:{room:{type:'string'},id:{type:'string'},theme:{type:'string'},type:{type:'string'},content:{type:'string'},attrs:{type:'string'}},required:['room','theme']}},
     {name:'votebank.put',description:'导入投票题库；mode=append/replace，presets 为 {question,options[]} 数组。',inputSchema:{type:'object',properties:{room:{type:'string'},mode:{type:'string',enum:['append','replace']},presets:{type:'array',items:{type:'object',properties:{question:{type:'string'},options:{type:'array',items:{type:'string'}}},required:['question','options']}},question:{type:'string'},options:{type:'array',items:{type:'string'}}},required:['room']}},
     {name:'rubric.put',description:'导入作业评分标准；items 为 {t,pts,desc}，按 task 保存。',inputSchema:{type:'object',properties:{room:{type:'string'},task:{type:'string'},items:{type:'array',items:{type:'object',properties:{t:{type:'string'},pts:{type:'number'},desc:{type:'string'}},required:['t','pts']}}},required:['room','task','items']}}
-,
+
+,
     {name:'remote.state',description:'读取遥控器状态：投票、抢答、答题、计时、分组、卡片、素材/作业开关。语音控制前先查状态。',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
     {name:'remote.control',description:'执行遥控器操作，适合语音/Agent：material.open/close/toggle、hw.open/close/toggle、screen.set、group.score、roll.start/stop、poll.start/stop、buzz.enable/disable/start/reset、quiz.start/close、timer.start/pause/reset、workshop.open/close、card.push/withdraw。',inputSchema:{type:'object',properties:{room:{type:'string'},action:{type:'string',enum:['material.open','material.close','material.toggle','hw.open','hw.close','hw.toggle','screen.set','group.score','roll.start','roll.stop','poll.start','poll.stop','buzz.enable','buzz.disable','buzz.start','buzz.reset','quiz.start','quiz.close','timer.start','timer.pause','timer.reset','workshop.open','workshop.close','card.push','card.withdraw']},group:{type:'string'},delta:{type:'number'},view:{type:'string',enum:['course','data','report','workshop']},presetId:{type:'string'},question:{type:'string'},options:{type:'array',items:{type:'string'}},cardId:{type:'string'},id:{type:'string'},minutes:{type:'number'},mode:{type:'string',enum:['random','seq']},counts:{type:'object'},scores:{type:'object'}},required:['room','action']}}
   ];
@@ -756,6 +757,9 @@ const server=http.createServer(async (req,res)=>{
     return send(res,200,js,'text/javascript; charset=utf-8');
   }
   if(p==='/embed') return send(res,200,fs.readFileSync(path.join(__dirname,'embed.html')),'text/html; charset=utf-8');
+  if((p==='/rooms'||p==='/rooms.html') && req.method==='GET'){
+    res.writeHead(302,{'Location':'/home','Cache-Control':'no-store'}); return res.end();
+  }
   if(p==='/mcp'){
     if(req.method!=='POST'){
       if(req.method==='GET'){
