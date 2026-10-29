@@ -38,6 +38,27 @@ body{background:#0E0E10;color:#F4F4F5;font-family:Inter,'PingFang SC','Microsoft
 .poll-track{height:clamp(14px,1.6vw,24px);border-radius:99px;background:#27272A;overflow:hidden}
 .poll-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#9EDC2F,#CBF74E);transition:width .5s ease}
 .poll-meta{font-size:clamp(13px,1.3vw,18px);color:#A1A1AA;margin-top:3vh}
+.dataView{position:absolute;inset:0;z-index:3;display:none;flex-direction:column;padding:90px 5vw 3vh;background:radial-gradient(120% 90% at 50% 0,#16352A,#0E0E10 60%);overflow:auto}
+.dataView.show{display:flex}
+.data-tabs{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;align-items:center;padding:6px;border:1px solid rgba(244,244,245,.14);border-radius:999px;background:rgba(20,24,22,.58);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 14px 44px rgba(0,0,0,.28);max-width:94vw;overflow:auto;z-index:6}
+.data-tab{border:0;background:transparent;color:#A1A1AA;font-family:inherit;font-size:clamp(11px,1vw,14px);font-weight:700;padding:8px clamp(10px,1.4vw,18px);border-radius:999px;white-space:nowrap;cursor:default}
+.data-tab.on{background:#CBF74E;color:#101410;box-shadow:0 0 24px rgba(203,247,78,.18)}
+.data-body{flex:1;min-height:0;display:flex;align-items:center}
+.data-panel{width:100%;animation:dataIn .45s cubic-bezier(.2,.7,.2,1) both}
+@keyframes dataIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.data-kicker{font-size:12px;letter-spacing:.3em;color:#6B6B76;margin-bottom:1.4vh}
+.data-h1{font-size:clamp(28px,4vw,64px);font-weight:900;line-height:1.1;letter-spacing:-.03em;margin-bottom:1vh}
+.data-sub{font-size:clamp(13px,1.4vw,20px);color:#A1A1AA;margin-bottom:4vh}
+.stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:2vh 0 3vh}
+.stat-card{border:1px solid rgba(203,247,78,.2);border-radius:16px;padding:14px 16px;background:rgba(203,247,78,.045)}
+.stat-card b{display:block;font-size:clamp(22px,2.8vw,42px);color:#CBF74E;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat-card span{display:block;color:#A1A1AA;font-size:clamp(11px,1vw,14px);margin-top:4px}
+.data-list{display:flex;flex-direction:column;gap:1.2vh;max-width:1200px}
+.data-row{display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(244,244,245,.10);padding:1vh 0}
+.data-row .num{font-size:clamp(18px,2vw,30px);font-weight:900;color:#CBF74E;min-width:54px;font-variant-numeric:tabular-nums}
+.data-row .name{flex:1;font-size:clamp(13px,1.4vw,20px);color:#F4F4F5}
+.data-row .tag{font-size:clamp(11px,1vw,14px);color:#A1A1AA}
+.data-note{font-size:clamp(12px,1.2vw,16px);color:#A1A1AA;margin-top:2vh;line-height:1.7}
 </style></head><body>
 <div class="top">
   <div class="brand">YSCOT · 授课大屏</div>
@@ -52,6 +73,10 @@ body{background:#0E0E10;color:#F4F4F5;font-family:Inter,'PingFang SC','Microsoft
   <div class="ws-card" id="wsCard"><span class="ws-empty">暂无行动卡 / 场景卡</span></div>
   <div class="ws-foot">遥控器 → 工作坊 → 开始计时 / 推送行动卡</div>
 </div>
+  <div class="dataView" id="dataView">
+    <div class="data-tabs" id="dataTabs"></div>
+    <div class="data-body" id="dataBody"></div>
+  </div>
   <div class="pollview" id="pollView">
     <div class="poll-kicker">YSCOT · 投票结果</div>
     <div class="poll-q" id="pollQ">暂无投票</div>
@@ -113,16 +138,67 @@ function tickClock(){
 }
 setInterval(tickClock,250);
 
+function tabButtons(active){
+  var tabs=[['base','基础信息'],['poll','投票结果'],['groups','分组情况 / 分数'],['homework','作业提交 / 分数'],['quiz','答题情况 / 分数']];
+  return tabs.map(function(t){return '<span class="data-tab'+(t[0]===active?' on':'')+'">'+t[1]+'</span>'}).join('');
+}
+function pollPanel(d){
+  var p=d.poll||{},opts=p.options||[],res=p.results||{},total=Number(p.count)||0,max=1;
+  opts.forEach(function(o,i){max=Math.max(max,Number(res[i]||0))});
+  return '<div class="data-kicker">YSCOT · 投票结果</div><div class="data-h1">'+(p.question?esc(p.question):'暂无投票')+'</div><div class="data-sub">已投 '+total+' 人'+(p.active?' · 进行中':' · 已结束')+'</div>'+
+    '<div class="poll-bars">'+(opts.length?opts.map(function(o,i){var n=Number(res[i]||0),pct=total?Math.round(n/total*100):0,w=Math.round(n/max*100);return '<div class="poll-row"><div class="lab"><span>'+esc(o)+'</span><span><b>'+n+'</b> 票 · '+pct+'%</span></div><div class="poll-track"><div class="poll-fill" style="width:'+w+'%"></div></div></div>'}).join(''):'<div class="data-note">还没有投票选项</div>')+'</div>';
+}
+function basePanel(d){
+  var m=d.meta||{},q=d.quiz||{};
+  return '<div class="data-kicker">YSCOT · 课堂数据</div><div class="data-h1">'+esc(d.title||m.title||('课堂 '+d.room))+'</div><div class="data-sub">'+esc([m.date,m.city||m.province,m.project].filter(Boolean).join(' · ')||('房间 '+d.room))+'</div>'+
+    '<div class="stat-grid"><div class="stat-card"><b>'+d.students+'</b><span>在场学员</span></div><div class="stat-card"><b>'+(d.groupsEnabled?'分组':'个人')+'</b><span>计分模式</span></div><div class="stat-card"><b>'+(d.homework?d.homework.count:0)+'</b><span>作业提交</span></div><div class="stat-card"><b>'+(q.answered||0)+'</b><span>答题人数</span></div></div>'+
+    '<div class="data-list">'+
+      '<div class="data-row"><span class="name">场次码</span><span class="tag"><b>'+esc(d.room)+'</b></span></div>'+
+      '<div class="data-row"><span class="name">日期</span><span class="tag">'+esc(m.date||'—')+'</span></div>'+
+      '<div class="data-row"><span class="name">地点</span><span class="tag">'+esc([m.province,m.city].filter(Boolean).join(' '))+'</span></div>'+
+      '<div class="data-row"><span class="name">客户 / 项目</span><span class="tag">'+esc(m.project||m.title||'—')+'</span></div>'+
+      '<div class="data-row"><span class="name">作业提交</span><span class="tag">'+(d.hwOpen?'已开启':'未开启')+' · '+(d.reviewEnabled?'评审开启':'评审关闭')+'</span></div>'+
+      '<div class="data-row"><span class="name">投票 / 抢答 / 答题</span><span class="tag">'+(d.poll&&d.poll.active?'投票进行中':'投票未进行')+' · '+(d.buzz&&d.buzz.winner?('抢答 '+esc(d.buzz.winner)):'抢答未开始')+' · '+(q.active?'答题进行中':'答题未发布')+'</span></div>'+
+    '</div>';
+}
+function groupsPanel(d){
+  if(d.groupsEnabled===false){
+    var rows=(d.individualTop||[]).map(function(s,i){return '<div class="data-row"><span class="num">'+(i+1)+'</span><span class="name">'+esc(s.name)+' <span class="tag">'+esc(s.tail||'')+'</span></span><span class="tag">个人 '+s.individualScore+' 分 · 抢答 '+s.buzzes+' 次</span></div>'}).join('');
+    return '<div class="data-kicker">YSCOT · 个人计分</div><div class="data-h1">个人积分榜</div><div class="data-sub">分组抽签已关闭，按个人计分</div><div class="data-list">'+(rows||'<div class="data-note">还没有学员</div>')+'</div>';
+  }
+  var gs=(d.groups||[]).slice().sort(function(a,b){return (b.perf||0)-(a.perf||0)});
+  var rows=gs.map(function(g){return '<div class="data-row"><span class="num">'+(g.perf||0)+'</span><span class="name">'+esc(g.id)+' 组 <span class="tag">'+g.count+' 人</span></span><span class="tag">'+esc(g.name||'')+'</span></div>'}).join('');
+  return '<div class="data-kicker">YSCOT · 分组情况</div><div class="data-h1">小组积分榜</div><div class="data-sub">表现分 + 作业分 · 按小组累计</div><div class="data-list">'+(rows||'<div class="data-note">还没有分组</div>')+'</div>';
+}
+function homeworkPanel(d){
+  var hw=d.homework||{byTask:[]}; var cards='<div class="stat-grid"><div class="stat-card"><b>'+hw.count+'</b><span>提交份数</span></div><div class="stat-card"><b>'+(d.reviewEnabled?'开启':'关闭')+'</b><span>作业评审</span></div><div class="stat-card"><b>'+d.hwCount+'</b><span>启用作业数</span></div><div class="stat-card"><b>'+hw.total+'</b><span>当前总分</span></div></div>';
+  var rows=(hw.byTask||[]).map(function(t){return '<div class="data-row"><span class="name">'+esc(t.id+' '+t.title)+'</span><span class="tag">'+t.count+' 份 · 已评 '+t.scored+' · 均分 '+t.avg+'</span></div>'}).join('');
+  return '<div class="data-kicker">YSCOT · 作业提交</div><div class="data-h1">作业提交与分数</div><div class="data-sub">'+(d.reviewEnabled?'按评分标准统计':'评审已关闭，仅保存提交')+'</div>'+cards+'<div class="data-list">'+(rows||'<div class="data-note">还没有提交</div>')+'</div>';
+}
+function quizPanel(d){
+  var q=d.quiz;
+  if(!q) return '<div class="data-kicker">YSCOT · 在线答题</div><div class="data-h1">答题情况</div><div class="data-sub">还没有发布答题</div>';
+  var cards='<div class="stat-grid"><div class="stat-card"><b>'+q.answered+'</b><span>已答人数</span></div><div class="stat-card"><b>'+q.avg+'</b><span>平均分</span></div><div class="stat-card"><b>'+q.count+'</b><span>题目数</span></div><div class="stat-card"><b>'+q.points+'</b><span>满分</span></div></div>';
+  var rows=(q.top||[]).map(function(s,i){return '<div class="data-row"><span class="num">'+(i+1)+'</span><span class="name">'+esc(s.name)+' <span class="tag">'+esc(s.tail||'')+'</span></span><span class="tag">'+(s.score||0)+' / '+(s.total||0)+'</span></div>'}).join('');
+  return '<div class="data-kicker">YSCOT · 答题情况</div><div class="data-h1">在线答题</div><div class="data-sub">答题分数与排名</div>'+cards+'<div class="data-list">'+(rows||'<div class="data-note">还没有提交</div>')+'</div>';
+}
+function showData(d){
+  var dv=document.getElementById('dataView'),f=document.getElementById('viewFrame'),e=document.getElementById('empty');
+  var tab=(d.screenDataTab||'base'); if(['base','poll','groups','homework','quiz'].indexOf(tab)<0)tab='base';
+  document.getElementById('dataTabs').innerHTML=tabButtons(tab);
+  var body=tab==='base'?basePanel(d):tab==='poll'?pollPanel(d):tab==='groups'?groupsPanel(d):tab==='homework'?homeworkPanel(d):quizPanel(d);
+  document.getElementById('dataBody').innerHTML='<div class="data-panel">'+body+'</div>';
+  dv.classList.add('show'); f.style.display='none'; e.classList.remove('show');
+}
+function hideData(){document.getElementById('dataView').classList.remove('show')}
 function refresh(){
   fetch('/api/screen?room='+room,{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
     var view=d.screenView||'data';
-    if(view==='poll'){ hideWorkshop(); showPoll(d); return; }
-    if(view==='workshop'){ hidePoll(); showWorkshop(d); return; }
-    hideWorkshop(); hidePoll();
+    if(view==='data'||view==='poll'||view==='report'||view==='stats'){ hideWorkshop(); hidePoll(); showData(d); return; }
+    if(view==='workshop'){ hideData(); hidePoll(); showWorkshop(d); return; }
+    hideData(); hideWorkshop(); hidePoll();
     if(view==='course'){
       setFrame('/course-screen?room='+room+'&embed=1','','');
-    }else{
-      setFrame('/report?room='+room+'&embed=1','','');
     }
   }).catch(function(){});
 }

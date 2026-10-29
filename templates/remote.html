@@ -32,9 +32,16 @@ input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(
   </div>
   <div class="control-grid cols-3">
     <button class="btn" data-view="course">大屏·课件</button>
-    <button class="btn" data-view="data">大屏·报告</button>
+    <button class="btn" data-view="data">大屏·数据</button>
     <button class="btn" data-view="workshop">大屏·工作坊</button>
-<button class="btn" data-view="poll">大屏·投票结果</button>
+  </div>
+  <div class="k" style="margin-top:12px">大屏·数据</div>
+  <div class="control-grid cols-3" id="dataTabButtons">
+    <button class="btn" data-tab="base">基础信息</button>
+    <button class="btn" data-tab="poll">投票结果</button>
+    <button class="btn" data-tab="groups">分组情况 / 分数</button>
+    <button class="btn" data-tab="homework">作业提交 / 分数</button>
+    <button class="btn" data-tab="quiz">答题情况 / 分数</button>
   </div>
   <div class="k" style="margin-top:14px">小组积分</div>
   <div id="groupScores" class="small"></div>
@@ -151,6 +158,7 @@ document.getElementById('quizStart').onclick=function(){post('/api/admin/quiz',{
 document.getElementById('matToggle').onclick=function(){post('/api/admin/material',{open:!window.__mat}).then(refresh)};
 document.getElementById('hwToggle').onclick=function(){post('/api/admin/hw',{open:!window.__hw}).then(refresh)};
 document.querySelectorAll('[data-view]').forEach(function(b){b.onclick=function(){post('/api/admin/screen',{view:b.getAttribute('data-view')}).then(refresh)}});
+document.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){post('/api/admin/screen',{view:'data',tab:b.getAttribute('data-tab')}).then(refresh)}});
 loadPresets();
 refresh();setInterval(refresh,2500);
 </script></body></html>
