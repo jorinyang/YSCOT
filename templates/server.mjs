@@ -1044,7 +1044,7 @@ const server=http.createServer(async (req,res)=>{
     const ext=(name.split('.').pop()||'').toLowerCase();
     const ct=ext==='pdf'?'application/pdf':ext==='pptx'?'application/vnd.openxmlformats-officedocument.presentationml.presentation':ext==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':(ext==='html'||ext==='htm')?'text/html; charset=utf-8':'application/octet-stream';
     const hdr={'Content-Type':ct,'Content-Disposition':'inline','Cache-Control':'no-store'};
-    if(ext==='html'||ext==='htm') hdr['Content-Security-Policy']='sandbox';
+    if(ext==='html'||ext==='htm') hdr['Content-Security-Policy']="sandbox allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock";
     res.writeHead(200,hdr);
     return res.end(fs.readFileSync(f));
   }
