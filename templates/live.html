@@ -220,7 +220,8 @@ function renderHw(){
     var s=subs[h.id];
     var ok=s&&s.files&&s.files.length>0;
     var p=pending.filter(function(x){return x.task===h.id}).length;
-    var stat=ok?('已上传 '+s.files.length+' 个'):(p?('待提交 '+p+' 个'):'未上传');
+    var sc=(s&&s.total>0)?(' · 得分 '+s.total+(s.grade?'（'+s.grade+'）':'')):'';
+    var stat=ok?('已上传 '+s.files.length+' 个'+sc):(p?('待提交 '+p+' 个'):'未上传');
     return '<div class="hw"><span class="no">'+h.no+'</span><span class="info"><b>'+h.title+'</b><span>'+h.hint+'</span></span>'+
       '<span class="stat'+((ok||p)?' ok':'')+'">'+stat+'</span>'+
       '<label class="pick">选择文件<input type="file" data-hw="'+h.id+'" accept="'+h.accept+'" '+(h.multiple?'multiple':'')+' /></label></div>';

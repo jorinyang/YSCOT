@@ -159,7 +159,7 @@ function uploadFiles(inputId,msgId,allowed){
         if(allowed.indexOf(ext)<0){ resolve({ok:false,error:'只能上传 '+allowed.join(' / ')}); return; }
         var fr=new FileReader();
         fr.onload=function(){ var b64=String(fr.result).split(',')[1]||'';
-          fetch('/api/room/upload?room='+CODE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,data:b64})}).then(function(r){return r.json()}).then(resolve).catch(function(e){resolve({ok:false,error:e.message})});
+          fetch('/api/room/upload?room='+CODE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,data:b64})}).then(function(r){return r.text().then(function(t){try{return JSON.parse(t)}catch(e){return {ok:false,error:'服务端异常 HTTP '+r.status+'（文件过大时先看网关限制）：'+t.replace(/\s+/g,' ').slice(0,80)}}})}).then(resolve).catch(function(e){resolve({ok:false,error:e.message})});
         };
         fr.readAsDataURL(f);
       });
