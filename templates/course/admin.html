@@ -72,6 +72,7 @@ body{animation:pageIn .32s ease both}
 
     <div class="card" style="margin-top:14px">
         <div class="k">抽签与分组</div>
+        <div class="rowflex" style="margin-bottom:8px;align-items:center;gap:8px"><label class="small"><input type="checkbox" id="groupEnabled" /> 启用抽签分组</label><span class="muted small" id="groupModeHint"></span></div>
         <div id="groupStats"></div>
         <div class="rowflex" style="margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="muted small">每组最多</span>
@@ -89,9 +90,10 @@ body{animation:pageIn .32s ease both}
     </div>
 
     <div class="card" style="margin-top:14px">
-      <div class="k">作业配置（固定六关）</div>
+      <div class="k">作业配置</div>
+      <div class="rowflex" style="margin-top:2px;align-items:center;gap:8px;flex-wrap:wrap"><span class="muted small">作业数量</span><select id="hwCountSel" style="width:64px;padding:3px 6px"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select><span class="muted small" id="hwCountHint"></span></div>
       <div id="hwTasks" class="small"></div>
-      <div class="rowflex" style="margin-top:8px"><span class="muted small">作业提交</span><button class="btn sm" id="hwOpenBtn">—</button></div>
+      <div class="rowflex" style="margin-top:8px;gap:8px"><span class="muted small">作业提交</span><button class="btn sm" id="hwOpenBtn">—</button><span class="muted small">作业评审</span><button class="btn sm" id="reviewBtn">—</button></div>
     </div>
   </div>
 
@@ -493,7 +495,21 @@ refresh();setInterval(refresh,2500);
       };
       window.delVp=function(id){ if(!confirm('删除这道投票题？'))return; post('/api/admin/votepreset',{action:'delete',id:id}).then(function(){load()}); };
       var hwBtn=document.getElementById('hwOpenBtn'); if(hwBtn){ window.__hw=!!d.hwOpen; hwBtn.textContent=d.hwOpen?'关闭作业提交':'开启作业提交'; hwBtn.onclick=function(){ post('/api/admin/hw',{open:!window.__hw}).then(load); }; }
-      var hwList=document.getElementById('hwTasks'); if(hwList){ var ts=d.tasks||[]; hwList.innerHTML=ts.length?ts.map(function(t,i){return '<div style="padding:4px 0">'+(i+1)+'. '+t.title+'</div>'}).join(''):'<span class="muted">还没有作业题</span>'; }
+      var grpToggle=document.getElementById('groupEnabled');
+      if(grpToggle){ grpToggle.checked=d.groupsEnabled!==false; grpToggle.onchange=function(){ post('/api/admin/groupcfg',{enabled:grpToggle.checked}).then(load); }; }
+      var grpHint=document.getElementById('groupModeHint'); if(grpHint)grpHint.textContent=(d.groupsEnabled===false?'已关闭：学员按个人计分，遥控器分组加分不可用':'已启用：抽签、分组与小组积分可用');
+      ['groupMax','addGroup','resetGroups'].forEach(function(id){var el=document.getElementById(id);if(el)el.disabled=(d.groupsEnabled===false)});
+      var hwCountSel=document.getElementById('hwCountSel');
+      if(hwCountSel){ hwCountSel.value=String(d.hwCount||6); hwCountSel.onchange=function(){ post('/api/admin/hwcfg',{count:Number(hwCountSel.value)||6}).then(load); }; }
+      var reviewBtn=document.getElementById('reviewBtn');
+      if(reviewBtn){ reviewBtn.textContent=d.reviewEnabled===false?'开启作业评审':'关闭作业评审'; reviewBtn.onclick=function(){ post('/api/admin/review',{open:!(d.reviewEnabled!==false)}).then(load); }; }
+      var hwList=document.getElementById('hwTasks');
+      if(hwList){
+        var NAMES=['活动策划方案','表格协作','汇报与推介 PPT','对外宣传','项目协作','对外核对'];
+        var ts=(d.tasks&&d.tasks.length)?d.tasks:NAMES.map(function(n,i){return {id:'T'+(i+1),title:n}});
+        ts=ts.slice(0,Math.max(1,Math.min(6,Number(d.hwCount)||6)));
+        hwList.innerHTML=ts.length?ts.map(function(t,i){return '<div style="padding:4px 0">'+(i+1)+'. '+(t.title||('作业 '+(i+1)))+'</div>'}).join(''):'<span class="muted">还没有作业题</span>';
+      }
       var cl=document.getElementById('cardList');
       if(cl){ window.__extMaterials=d.materials||[]; window.__cards=d.cards||[]; cl.innerHTML=(window.__cards.length?window.__cards.map(function(c){return '<div style="border:1px solid #2A2A32;border-radius:10px;padding:8px 10px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+c.theme+'</b><span class="small muted">'+c.type+'</span></div><div class="small" style="margin-top:4px">'+c.content+'</div><div class="small muted" style="margin-top:4px">'+c.attrs+'</div><div style="margin-top:6px"><button class="btn sm" onclick="editCard(\''+c.id+'\')">编辑</button> <button class="btn sm danger" onclick="delCard(\''+c.id+'\')">删除</button></div></div>'}).join(''):'<span class="muted small">还没有卡片</span>'); }
       var mt=document.getElementById('matToggle');

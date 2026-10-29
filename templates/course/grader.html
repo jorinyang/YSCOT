@@ -66,6 +66,7 @@ body{animation:pageIn .32s ease both}
       <button class="btn danger" id="resetAll">清空全部提交</button>
     </div>
     <button class="btn ghost" id="hwToggle">作业提交：--</button>
+    <button class="btn ghost" id="reviewToggle">作业评审：--</button>
   </div>
   <div class="k" style="margin-top:14px">六关完成度（点行看详情）</div>
   <div style="overflow:auto"><table id="tbl"></table></div>
@@ -108,7 +109,8 @@ var TASKS=[
   auto:[{t:'报告结构',pts:3,type:'kw',kw:['汇总','逐项','建议'],per:1},{t:'差异类型覆盖',pts:7,type:'kw',kw:['重复','金额','数量','口径','漏记','跨期','优惠'],per:1},{t:'责任方定位',pts:2,type:'kw',kw:['演出方','场地方','设施','渠道','服务提供方','执行方'],per:2},{t:'差异合计',pts:2,type:'kw',kw:['57,900','57900','5.79'],per:2}],
   manual:[],crit:[['差异召回（10处）',10,'每处1分；漏报扣分'],['定位准确（方名+项目名）',3,'写清在哪一方的哪一行'],['金额核对',3,'差异金额与教师版一致'],['处理建议合理',4,'可执行、责任到方']]}
 ];
-var st=null, curKey='', hwOpen=false;
+var st=null, curKey='', hwOpen=false, reviewOpen=true;
+var ALL_TASKS=TASKS.slice(); var HWCOUNT=6;
 fetch(API+'/api/admin/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
   var rb=(d&&d.rubrics)||{};
   TASKS.forEach(function(t){ if(rb[t.id]&&rb[t.id].length){ t.crit=rb[t.id].map(function(x){return [x.t,x.pts,x.desc||'']}); } });
@@ -142,10 +144,12 @@ async function refresh(){
   try{
     st=await api('/api/admin/state');
     $('svc').textContent='已连接';$('svc').className='pill on';
-    hwOpen=!!(st.config&&st.config.hwOpen); syncHw(); renderMatrix(); renderSubs(); renderCrit();
+    HWCOUNT=Math.max(1,Math.min(6,Number(st.hwCount)||6)); TASKS=ALL_TASKS.slice(0,HWCOUNT);
+    hwOpen=!!(st.config&&st.config.hwOpen); reviewOpen=st.reviewEnabled!==false; syncHw(); syncReview(); renderMatrix(); renderSubs(); renderCrit();
   }catch(e){ $('svc').textContent='未连接';$('svc').className='pill'; }
 }
 function syncHw(){var b=$('hwToggle');b.textContent='作业提交：'+(hwOpen?'已开启':'已关闭');b.style.borderColor=hwOpen?'rgba(99,183,154,.5)':''}
+function syncReview(){var b=$('reviewToggle');if(b){b.textContent='作业评审：'+(reviewOpen?'已开启':'已关闭');b.style.borderColor=reviewOpen?'rgba(99,183,154,.5)':''}if($('aiRescore'))$('aiRescore').style.display=reviewOpen?'':'none';if(!reviewOpen&&$('detailCard')&&$('detailCard').style.display!=='none'&&curKey)openSubmission(curKey);}
 
 function renderMatrix(){
   var students=(st.students||[]).slice().sort(function(a,b){var ga=(a.group||'Z'),gb=(b.group||'Z');return ga===gb?(a.name>b.name?1:-1):(ga>gb?1:-1)});
@@ -185,7 +189,7 @@ function openSubmission(key){
     var s=subOf(key,t.id); if(!s) return;
     var r=totalOf(t,s);
     body+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+t.id+' '+t.name+'</b><span class="pill">'+r.total+' / '+t.pts+' 分'+(r.override!=null?' · 人工定分':'')+'</span></div>';
-    body+='<div class="rowflex" style="margin:6px 0"><button class="btn sm ai" data-ai="'+t.id+'" style="padding:3px 10px;font-size:12px">AI 评分</button><span class="muted small">模型按评分标准打分，可再人工改</span></div>';
+    body+='<div class="rowflex" style="margin:6px 0"><button class="btn sm ai" data-ai="'+t.id+'" style="padding:3px 10px;font-size:12px" '+(reviewOpen?'':'disabled')+'>AI 评分</button><span class="muted small">'+(reviewOpen?'模型按评分标准打分，可再人工改':'评审已关闭，仅保留已上传作业')+'</span></div>';
     body+='<div class="small muted" style="margin:6px 0">自动 '+r.auto+' · 人工 '+r.manual+' · 拆解 '+r.break+'（三问达标 '+r.breakN+'/3）</div>';
     if((s.files||[]).length){
       body+='<div style="margin:6px 0">产物文件：'+s.files.map(function(f,i){return '<a href="'+API+'/api/file?key='+encodeURIComponent(s.key)+'&task='+s.task+'&i='+i+'" target="_blank">'+f.name+'（'+Math.round((f.size||0)/1024)+'KB）</a>'}).join('、')+'</div>';
@@ -195,10 +199,10 @@ function openSubmission(key){
       body+='<div class="k" style="margin-top:8px">人工核对</div>';
       t.manual.forEach(function(c){
         var on=(s.manual||[]).indexOf(c.t)>=0;
-        body+='<label class="check"><input type="checkbox" data-man="'+s.key+'" data-item="'+c.t+'" '+(on?'checked':'')+' /> '+c.t+'（'+c.pts+'分）</label>';
+        body+='<label class="check"><input type="checkbox" data-man="'+s.key+'" data-item="'+c.t+'" '+(on?'checked':'')+' '+(reviewOpen?'':'disabled')+' /> '+c.t+'（'+c.pts+'分）</label>';
       });
     }
-    body+='<div class="rowflex" style="margin-top:10px"><input type="number" id="ovr-'+s.key.replace(/\|/g,'-')+'" placeholder="人工总分" value="'+(r.override!=null?r.override:'')+'" style="width:100px;padding:5px 8px;font-size:12px" /><button class="btn sm" data-ovr="'+s.key+'">存人工分</button><button class="btn sm danger" data-del="'+s.key+'">删除此提交</button></div></div>';
+    body+='<div class="rowflex" style="margin-top:10px"><input type="number" id="ovr-'+s.key.replace(/\|/g,'-')+'" placeholder="人工总分" value="'+(r.override!=null?r.override:'')+'" '+(reviewOpen?'':'disabled')+' style="width:100px;padding:5px 8px;font-size:12px" /><button class="btn sm" data-ovr="'+s.key+'" '+(reviewOpen?'':'disabled')+'>存人工分</button><button class="btn sm danger" data-del="'+s.key+'">删除此提交</button></div></div>';
   });
   $('detailBody').innerHTML=body;
   [].slice.call($('detailBody').querySelectorAll('[data-ai]')).forEach(function(b){
@@ -256,6 +260,7 @@ $('refresh').addEventListener('click',refresh);
 $('closeDetail').addEventListener('click',function(){$('detailCard').style.display='none'});
 $('critBtn').addEventListener('click',function(){var c=$('critCard');c.style.display=c.style.display==='none'?'block':'none'});
 $('hwToggle').addEventListener('click',async function(){try{await post('/api/admin/hw',{open:!hwOpen});await refresh()}catch(e){alert('需要服务连接')}});
+$('reviewToggle').addEventListener('click',async function(){try{await post('/api/admin/review',{open:!reviewOpen});await refresh()}catch(e){alert('需要服务连接')}});
 $('resetAll').addEventListener('click',async function(){if(!confirm('清空全部提交与评分？不可恢复。'))return;try{await post('/api/admin/reset',{scope:'all'});await refresh();$('detailCard').style.display='none'}catch(e){alert('清空失败')}});
 $('exportBtn').addEventListener('click',function(){
   var rows=[['姓名','尾号','小组'].concat(TASKS.map(function(t){return t.id+'_'+t.name})).concat(['总分'])];

@@ -34,6 +34,7 @@ input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(
     <button class="btn" data-view="course">大屏·课件</button>
     <button class="btn" data-view="data">大屏·报告</button>
     <button class="btn" data-view="workshop">大屏·工作坊</button>
+<button class="btn" data-view="poll">大屏·投票结果</button>
   </div>
   <div class="k" style="margin-top:14px">小组积分</div>
   <div id="groupScores" class="small"></div>
@@ -101,8 +102,12 @@ function refresh(){api('/api/admin/state').then(function(d){
   var tm=d.timer||{};
   document.getElementById('wsStat').textContent=(tm.running?('计时中 · 剩 '+Math.max(0,Math.round((tm.endAt-Date.now())/60000))+' 分钟'):'计时未开始')+(cfg.workshopOpen?' · 卡片已推送':'');
   var wm=document.getElementById('wsMin'); if(wm&&document.activeElement!==wm){ wm.value=String(cfg.wsMinutes||90); }
-  var gs=(d.groups||[]).map(function(g){return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #2A2A32"><b style="width:26px">'+g.id+'</b><span style="flex:1">'+g.name+' · '+g.perf+'</span><button class="btn" data-g="'+g.id+'" data-d="-1">−1</button><button class="btn" data-g="'+g.id+'" data-d="1">+1</button></div>'}).join('');
-  document.getElementById('groupScores').innerHTML=gs||'<span class="muted">还没有分组</span>';
+  if(d.groupsEnabled===false){
+    document.getElementById('groupScores').innerHTML='<span class="muted">分组抽签已关闭 · 学员按个人计分</span>';
+  }else{
+    var gs=(d.groups||[]).map(function(g){return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #2A2A32"><b style="width:26px">'+g.id+'</b><span style="flex:1">'+g.name+' · '+g.perf+'</span><button class="btn" data-g="'+g.id+'" data-d="-1">−1</button><button class="btn" data-g="'+g.id+'" data-d="+1</button></div>'}).join('');
+    document.getElementById('groupScores').innerHTML=gs||'<span class="muted">还没有分组</span>';
+  }
   var rl=d.roll||{};
   document.getElementById('rollName').textContent=rl.active?(rl.name||''):'';
   document.getElementById('rollStat').textContent=rl.active?('第 '+(rl.round||0)+' 轮 · 请该学员回答'):'未点名';

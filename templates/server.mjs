@@ -94,7 +94,7 @@ function loadRoom(code){
   if(!fs.existsSync(f)) return blank();
   try{ return Object.assign(blank(), JSON.parse(fs.readFileSync(f,'utf8'))); }catch(e){ return blank(); }
 }
-function saveRoom(code, st){ const f=roomStateFile(code); fs.mkdirSync(path.dirname(f),{recursive:true}); fs.writeFileSync(f, JSON.stringify(st,null,1)); }
+function saveRoom(code, st){ const f=roomStateFile(code); fs.mkdirSync(path.dirname(f),{recursive:true}); fs.writeFileSync(f, JSON.stringify(st)); }
 function listRooms(teacher){
   const out=[];
   const one=function(code){
@@ -119,13 +119,14 @@ function createRoom(title, city, date, owner, province, project){
   saveRoom(code, blank());
   return code;
 }
-function setRoom(code){ currentRoom = validRoom(code) ? code : DEFAULT_ROOM; state = loadRoom(currentRoom); }
+const roomCache={};
+function setRoom(code){ currentRoom = validRoom(code) ? code : DEFAULT_ROOM; state = roomCache[currentRoom] || (roomCache[currentRoom] = loadRoom(currentRoom)); }
 function cookieRoom(req){ const m=String(req.headers.cookie||'').match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/); return m?m[1]:''; }
 
 function ensureDir(){ if(!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR,{recursive:true}); }
 function blank(){
   const groups={}; GROUPS.forEach(g=>groups[g]={name:g+'组',perf:0});
-  return {students:{},groups,poll:{active:false,question:'',options:[],votes:{},startedAt:''},submissions:{},config:{hwOpen:false,workshopOpen:false,materialOpen:false,screenView:'stats',slide:0,groupMax:3,wsMinutes:90,activeCard:'',model:{baseUrl:'https://api.deepseek.com',model:'deepseek-flash',apiKey:''}},buzz:{enabled:false,running:false,winner:'',round:0,at:''},tasks:[],votePresets:[],cards:[],materials:[],rubrics:{},roll:{active:false,key:'',name:'',round:0,at:0},timer:{running:false,endAt:0,duration:0},quiz:{bank:{choice:[],judge:[],blank:[],short:[]},config:{mode:'random',counts:{choice:5,judge:3,blank:2,short:1},scores:{choice:2,judge:2,blank:3,short:10}},paper:null,answers:{}},updatedAt:new Date().toISOString()};
+  return {students:{},groups,poll:{active:false,question:'',options:[],votes:{},startedAt:''},submissions:{},config:{hwOpen:false,workshopOpen:false,materialOpen:false,screenView:'stats',slide:0,groupMax:3,groupsEnabled:true,reviewEnabled:true,hwCount:6,wsMinutes:90,activeCard:'',model:{baseUrl:'https://api.deepseek.com',model:'deepseek-flash',apiKey:''}},buzz:{enabled:false,running:false,winner:'',round:0,at:''},tasks:[],votePresets:[],cards:[],materials:[],rubrics:{},roll:{active:false,key:'',name:'',round:0,at:0},timer:{running:false,endAt:0,duration:0},quiz:{bank:{choice:[],judge:[],blank:[],short:[]},config:{mode:'random',counts:{choice:5,judge:3,blank:2,short:1},scores:{choice:2,judge:2,blank:3,short:10}},paper:null,answers:{}},updatedAt:new Date().toISOString()};
 }
 function load(){ ensureDir(); if(!fs.existsSync(STATE_FILE)) return blank();
   try{ const s=JSON.parse(fs.readFileSync(STATE_FILE,'utf8')); return Object.assign(blank(),s); }catch(e){ return blank(); } }
@@ -137,6 +138,10 @@ try{
 }catch(e){}
 let saveTimer=null;
 function save(){ clearTimeout(saveTimer); const room=currentRoom; try{ saveRoom(room, state); }catch(e){ console.error('save fail',e.message); } }
+function groupsOn(){ return !(state.config&&state.config.groupsEnabled===false); }
+function reviewOn(){ return !(state.config&&state.config.reviewEnabled===false); }
+function hwCountOn(){ return Math.max(1,Math.min(6,Number(state.config&&state.config.hwCount)||6)); }
+function taskAllowed(t){ const m=/^T([1-6])$/.exec(String(t||'')); return !!m && Number(m[1])<=hwCountOn(); }
 function keyOf(name,tail){ return String(name||'').trim()+'|'+String(tail||'').trim(); }
 function groupCounts(){ const c={}; Object.keys(state.groups).forEach(g=>c[g]=0); Object.values(state.students).forEach(s=>{ if(s.group&&c[s.group]!==undefined) c[s.group]++ }); return c; }
 function ensureStudent(name,tail){ const k=keyOf(name,tail); if(!state.students[k]){ state.students[k]={name:String(name).trim(),tail:String(tail).trim(),group:'',score:0,votes:0,buzzes:0,joinedAt:new Date().toISOString()}; save(); } return state.students[k]; }
@@ -197,10 +202,15 @@ function studentView(k){
     const gsub=Object.keys(state.submissions).reduce((a,k2)=>{const st=state.students[k2.split('||')[0]];return a+((st&&st.group===s.group)?(((state.submissions[k2].score)||{}).total||0):0)},0);
     groupScore=groupPerf+gsub;
   }
+  let _hwScore=0; Object.keys(state.submissions||{}).forEach(function(sk){ if(sk.indexOf(k+'||')===0)_hwScore+=(((state.submissions[sk]||{}).score||{}).total||0); });
+  const _quizScore=((((state.quiz||{}).answers||{})[k])||{}).score||0;
+  const _personalScore=Math.round((_hwScore+_quizScore)*10)/10;
+  const _groupsOn=groupsOn();
   return {
     ok:true,
     room: currentRoom,
-    me: s?{name:s.name,tail:s.tail,group:s.group,score:groupScore,groupPerf:groupPerf,groupScore:groupScore}:null,
+    me: s?{name:s.name,tail:s.tail,group:s.group,score:_groupsOn?groupScore:_personalScore,groupPerf:groupPerf,groupScore:groupScore,individualScore:_personalScore,hwScore:_hwScore,quizScore:_quizScore}:null,
+    groupsEnabled:_groupsOn,reviewEnabled:reviewOn(),hwCount:hwCountOn(),
     poll: poll.active?{active:true,question:poll.question,options:poll.options,voted,myVote:voted?poll.votes[k]:null,startedAt:poll.startedAt}:{active:false},
     hwOpen: !!(state.config&&state.config.hwOpen),
     workshopOpen: !!(state.config&&state.config.workshopOpen),
@@ -228,7 +238,7 @@ function remoteView(){
   const cards=(state.cards||[]).map(function(c){return {id:c.id,theme:c.theme,type:c.type}});
   const active=(state.cards||[]).filter(function(c){return c.id===cfg.activeCard})[0]||null;
   return {
-    ok:true,room:currentRoom,title:roomTitle,materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,
+    ok:true,room:currentRoom,title:roomTitle,materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),
     screenView:cfg.screenView||'data',workshopOpen:!!cfg.workshopOpen,
     groups:groups,
     roll:{active:!!roll.active,name:roll.name||'',round:roll.round||0},
@@ -252,7 +262,7 @@ function adminView(){
   if(state.poll.options&&state.poll.options.length){ state.poll.options.forEach((o,i)=>{results[i]=0}); Object.values(state.poll.votes||{}).forEach(v=>{ if(results[v]!==undefined) results[v]++ }); }
   const subs=Object.keys(state.submissions).map(k=>{ const p=k.split('||'); const st=state.students[p[0]]||{}; const sub=state.submissions[k]; return {key:k,studentKey:p[0],name:st.name||p[0],tail:st.tail||'',task:p[1],text:sub.text||'',fileName:sub.fileName||'',q1:sub.q1||'',q2:sub.q2||'',q3:sub.q3||'',files:sub.files||[],at:sub.at,manual:sub.manual||[],score:sub.score||null}; });
   const _mc=modelCfg();
-  return {ok:true,timer:state.timer||null,workshopOpen:!!(state.config&&state.config.workshopOpen),quiz:quizInfo,model:{baseUrl:_mc.base,model:_mc.model,hasKey:!!_mc.key},config:state.config||{},votePresets:state.votePresets||[],cards:state.cards||[],materials:state.materials||[],rubrics:state.rubrics||{},activeCard:(state.config&&state.config.activeCard)||'',activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===(state.config&&state.config.activeCard)})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null;})(),tasks:state.tasks||[],hwOpen:!!(state.config&&state.config.hwOpen),buzz:state.buzz||{enabled:false,running:false,winner:''},students:Object.keys(state.students).map(function(k){const st=Object.assign({key:k},state.students[k]);st.hwScore=Object.keys(state.submissions||{}).filter(function(sk){return sk.indexOf(k+'||')===0}).reduce(function(a,sk){return a+(((state.submissions[sk]||{}).score||{}).total||0)},0);st.quizScore=(((state.quiz&&state.quiz.answers&&state.quiz.answers[k])||{}).score)||0;return st}),groups:Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name,perf:state.groups[g].perf||0,count:counts[g]})),counts,roll:state.roll||{active:false},poll:{active:state.poll.active,question:state.poll.question,options:state.poll.options,votes:state.poll.votes,results,startedAt:state.poll.startedAt},submissions:subs,updatedAt:state.updatedAt};
+  return {ok:true,timer:state.timer||null,workshopOpen:!!(state.config&&state.config.workshopOpen),quiz:quizInfo,model:{baseUrl:_mc.base,model:_mc.model,hasKey:!!_mc.key},config:state.config||{},groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),votePresets:state.votePresets||[],cards:state.cards||[],materials:state.materials||[],rubrics:state.rubrics||{},activeCard:(state.config&&state.config.activeCard)||'',activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===(state.config&&state.config.activeCard)})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null;})(),tasks:state.tasks||[],hwOpen:!!(state.config&&state.config.hwOpen),buzz:state.buzz||{enabled:false,running:false,winner:''},students:Object.keys(state.students).map(function(k){const st=Object.assign({key:k},state.students[k]);st.hwScore=Object.keys(state.submissions||{}).filter(function(sk){return sk.indexOf(k+'||')===0}).reduce(function(a,sk){return a+(((state.submissions[sk]||{}).score||{}).total||0)},0);st.quizScore=(((state.quiz&&state.quiz.answers&&state.quiz.answers[k])||{}).score)||0;st.individualScore=Math.round((st.hwScore+st.quizScore)*10)/10;return st}),groups:Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name,perf:state.groups[g].perf||0,count:counts[g]})),counts,roll:state.roll||{active:false},poll:{active:state.poll.active,question:state.poll.question,options:state.poll.options,votes:state.poll.votes,results,startedAt:state.poll.startedAt},submissions:subs,updatedAt:state.updatedAt};
 }
 async function aiScoreSubmission(sub,rubric,taskName){
   if(!sub) return {ok:false,error:'submission not found'};
@@ -394,10 +404,11 @@ async function mcpHandle(msg, mcpTeacher){
         if(act.indexOf('material.')===0){ state.config.materialOpen=act==='material.open'?true:act==='material.close'?false:!state.config.materialOpen; save(); }
         else if(act.indexOf('hw.')===0){ state.config.hwOpen=act==='hw.open'?true:act==='hw.close'?false:!state.config.hwOpen; save(); }
         else if(act==='screen.set'){
-          let v=String(a.view||'data'); if(v==='report'||v==='stats')v='data'; if(['course','data','workshop'].indexOf(v)<0)return bad('view 只支持 course / data / workshop / report');
+          let v=String(a.view||'data'); if(v==='report'||v==='stats')v='data'; if(['course','data','workshop','poll'].indexOf(v)<0)return bad('view 只支持 course / data / workshop / poll / report');
           state.config.screenView=v; save();
         }
         else if(act==='group.score'){
+          if(!groupsOn())return bad('分组抽签已关闭，按个人计分');
           const g=String(a.group||''); if(!state.groups[g])return bad('分组不存在：'+g); const d=Number(a.delta); if(!isFinite(d))return bad('delta 需要是数字');
           state.groups[g].perf=(state.groups[g].perf||0)+d; save();
         }
@@ -749,7 +760,7 @@ function screenView(){
   const quiz=state.quiz||{};
   const paper=quiz.paper;
   let _meta={}; try{ _meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
-  return {ok:true,room:currentRoom,title:_meta.title||('课堂 '+currentRoom),at:Date.now(),screenView:(state.config&&state.config.screenView)||'stats',slide:(state.config&&state.config.slide)||0,packageId:_meta.packageId||'',materialOpen:!!(state.config&&state.config.materialOpen),hwOpen:!!(state.config&&state.config.hwOpen),groups:Object.keys(state.groups||{}).map(function(g){return {id:g,name:state.groups[g].name,perf:state.groups[g].perf||0}}),activeCard:(state.config&&state.config.activeCard)||'',files:(_meta.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}}),workshopOpen:!!(state.config&&state.config.workshopOpen),timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
+  return {ok:true,room:currentRoom,title:_meta.title||('课堂 '+currentRoom),at:Date.now(),groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),screenView:(state.config&&state.config.screenView)||'stats',slide:(state.config&&state.config.slide)||0,packageId:_meta.packageId||'',materialOpen:!!(state.config&&state.config.materialOpen),hwOpen:!!(state.config&&state.config.hwOpen),groups:Object.keys(state.groups||{}).map(function(g){return {id:g,name:state.groups[g].name,perf:state.groups[g].perf||0}}),activeCard:(state.config&&state.config.activeCard)||'',files:(_meta.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}}),workshopOpen:!!(state.config&&state.config.workshopOpen),timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     poll:{active:!!poll.active,question:poll.question||'',options:poll.options||[],results,count:Object.keys(poll.votes||{}).length},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',round:(state.buzz&&state.buzz.round)||0},
     quiz:paper?{active:!!paper.active,count:paper.questions.length,points:paper.questions.reduce((a,b)=>a+(b.score||0),0),answered:Object.keys(quiz.answers||{}).length,avg:(function(){const v=Object.values(quiz.answers||{});return v.length?Math.round(v.reduce((a,b)=>a+(b.score||0),0)/v.length*10)/10:0})()}:null,
@@ -1211,7 +1222,7 @@ const server=http.createServer(async (req,res)=>{
     const b=await readBody(req); const code=String(b.code||'').toUpperCase();
     if(!validRoom(code)) return send(res,400,{ok:false,error:'房间码不对'});
     const f=roomStateFile(code); if(!fs.existsSync(f)) return send(res,404,{ok:false,error:'房间不存在'});
-    setRoom(code); state=blank(); save();
+    setRoom(code); state=roomCache[currentRoom]=blank(); save();
     return send(res,200,{ok:true,code});
   }
   if(p==='/api/screen/perf' && req.method==='POST'){
@@ -1261,6 +1272,7 @@ const server=http.createServer(async (req,res)=>{
         const b=(p==='/api/upload')?{}:await readBody(req);
         if(p==='/api/join'){ const s=ensureStudent(b.name,b.tail); return send(res,200,{ok:true,me:s}); }
         if(p==='/api/draw'){
+          if(!groupsOn()) return send(res,400,{ok:false,error:'分组抽签已关闭，按个人计分'});
           const k=keyOf(b.name,b.tail); const s=ensureStudent(b.name,b.tail);
           if(s.group) return send(res,200,{ok:true,group:s.group,already:true});
           const counts=groupCounts(); const max=Number(state.config&&state.config.groupMax)||3;
@@ -1295,6 +1307,7 @@ const server=http.createServer(async (req,res)=>{
           return send(res,200,{ok:true,score:Math.round(score*10)/10,total:total});
         }
         if(p==='/api/homework'){
+          if(!taskAllowed(b.task)) return send(res,400,{ok:false,error:'该作业未启用'});
           const k=keyOf(b.name,b.tail); ensureStudent(b.name,b.tail);
           state.submissions[k+'||'+b.task]={text:b.text||'',fileName:b.fileName||'',q1:b.q1||'',q2:b.q2||'',q3:b.q3||'',at:new Date().toLocaleString('zh-CN'),manual:[],score:null};
           state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true});
@@ -1302,6 +1315,7 @@ const server=http.createServer(async (req,res)=>{
         if(p==='/api/upload'&&req.method==='POST'){
           const q=u.searchParams;const name=q.get('name')||'',tail=q.get('tail')||'',task=q.get('task')||'T1',fn=q.get('filename')||'file.bin',batch=String(q.get('batch')||'');
           const k=keyOf(name,tail);ensureStudent(name,tail);
+          if(!taskAllowed(task)) return send(res,400,{ok:false,error:'该作业未启用'});
           const chunks=[];let size=0;
           for await (const ch of req){size+=ch.length;if(size>25*1024*1024){return send(res,413,{ok:false,error:'file too large (25MB)'})}chunks.push(ch)}
           const buf=Buffer.concat(chunks);
@@ -1384,20 +1398,23 @@ const server=http.createServer(async (req,res)=>{
           if(b.action==='resetbank'){ state.quiz.bank={choice:[],judge:[],blank:[],short:[]}; state.quiz.paper=null; state.quiz.answers={}; save(); return send(res,200,{ok:true}); }
           return send(res,400,{ok:false,error:'bad action'});
         }
-        if(p==='/api/admin/groupcfg'){ state.config=state.config||{}; state.config.groupMax=Math.max(1,Math.min(10,Number(b.max)||3)); save(); return send(res,200,{ok:true,groupMax:state.config.groupMax}); }
-        if(p==='/api/admin/groupadd'){
+        if(p==='/api/admin/groupcfg'){ state.config=state.config||{};
+            if(b.enabled!==undefined){ state.config.groupsEnabled=!!b.enabled; }
+            if(b.max!==undefined){ state.config.groupMax=Math.max(1,Math.min(10,Number(b.max)||3)); }
+            save(); return send(res,200,{ok:true,groupMax:state.config.groupMax||3,groupsEnabled:groupsOn()}); }
+        if(p==='/api/admin/groupadd'){ if(!groupsOn()) return send(res,400,{ok:false,error:'分组抽签已关闭'});
           const used=Object.keys(state.groups);
           const letter='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(c=>used.indexOf(c)<0)[0];
           if(!letter) return send(res,400,{ok:false,error:'分组已达上限'});
           state.groups[letter]={name:letter+'组',perf:0}; state.updatedAt=new Date().toISOString(); save();
           return send(res,200,{ok:true,id:letter});
         }
-        if(p==='/api/admin/grouprename'){
+        if(p==='/api/admin/grouprename'){ if(!groupsOn()) return send(res,400,{ok:false,error:'分组抽签已关闭'});
           if(!state.groups[b.id]) return send(res,404,{ok:false,error:'no group'});
           state.groups[b.id].name=String(b.name||'').trim()||state.groups[b.id].name; save();
           return send(res,200,{ok:true});
         }
-        if(p==='/api/admin/groupdel'){
+        if(p==='/api/admin/groupdel'){ if(!groupsOn()) return send(res,400,{ok:false,error:'分组抽签已关闭'});
           const ids=Object.keys(state.groups);
           if(ids.length<=1) return send(res,400,{ok:false,error:'至少保留一个分组'});
           if(!state.groups[b.id]) return send(res,404,{ok:false,error:'no group'});
@@ -1470,7 +1487,7 @@ const server=http.createServer(async (req,res)=>{
           return send(res,200,{ok:true,list:state.cards});
         }
         if(p==='/api/admin/material'){ state.config=state.config||{}; state.config.materialOpen=!!b.open; save(); return send(res,200,{ok:true,materialOpen:state.config.materialOpen}); }
-        if(p==='/api/admin/screen'){ state.config=state.config||{}; const v=(b.view==='course'||b.view==='workshop')?b.view:'data'; state.config.screenView=v; save(); return send(res,200,{ok:true,screenView:v}); }
+        if(p==='/api/admin/screen'){ state.config=state.config||{}; const v=(b.view==='course'||b.view==='workshop'||b.view==='poll')?b.view:'data'; state.config.screenView=v; save(); return send(res,200,{ok:true,screenView:v}); }
         if(p==='/api/admin/slide'){
           state.config=state.config||{}; let n=Number(state.config.slide)||0;
           if(b.action==='next')n++; else if(b.action==='prev')n=Math.max(0,n-1); else if(b.value!==undefined)n=Math.max(0,Number(b.value)||0);
@@ -1496,6 +1513,8 @@ const server=http.createServer(async (req,res)=>{
         }
         if(p==='/api/admin/workshopcfg'){ state.config=state.config||{}; state.config.wsMinutes=Math.max(1,Math.min(240,Number(b.minutes)||90)); save(); return send(res,200,{ok:true,wsMinutes:state.config.wsMinutes}); }
         if(p==='/api/admin/workshop'){ state.config=state.config||{}; state.config.workshopOpen=!!b.open; if(!b.open) state.config.activeCard=''; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,workshopOpen:state.config.workshopOpen}); }
+        if(p==='/api/admin/hwcfg'){ state.config=state.config||{}; state.config.hwCount=Math.max(1,Math.min(6,Number(b.count)||6)); state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,hwCount:hwCountOn()}); }
+        if(p==='/api/admin/review'){ state.config=state.config||{}; state.config.reviewEnabled=!!b.open; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,reviewEnabled:reviewOn()}); }
         if(p==='/api/admin/hw'){ state.config=state.config||{hwOpen:false}; state.config.hwOpen=!!b.open; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,hwOpen:state.config.hwOpen}); }
         if(p==='/api/admin/delsub'){
           var sub=state.submissions[b.key];
@@ -1508,8 +1527,8 @@ const server=http.createServer(async (req,res)=>{
           state.poll={active:true,question:b.question||'',options:(b.options||[]).filter(x=>String(x).trim()),votes:{},startedAt:new Date().toLocaleString('zh-CN')};
           state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true});
         }
-        if(p==='/api/admin/group'){ const k=keyOf(b.name,b.tail); const s=state.students[k]; if(!s) return send(res,404,{ok:false,error:'student not found'}); s.group=b.group||''; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true}); }
-        if(p==='/api/admin/perf'){ if(!state.groups[b.group]) return send(res,400,{ok:false,error:'bad group'}); state.groups[b.group].perf=(state.groups[b.group].perf||0)+Number(b.delta||0); state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,perf:state.groups[b.group].perf}); }
+        if(p==='/api/admin/group'){ if(!groupsOn()) return send(res,400,{ok:false,error:'分组抽签已关闭'}); const k=keyOf(b.name,b.tail); const s=state.students[k]; if(!s) return send(res,404,{ok:false,error:'student not found'}); s.group=b.group||''; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true}); }
+        if(p==='/api/admin/perf'){ if(!groupsOn()) return send(res,400,{ok:false,error:'分组抽签已关闭'}); if(!state.groups[b.group]) return send(res,400,{ok:false,error:'bad group'}); state.groups[b.group].perf=(state.groups[b.group].perf||0)+Number(b.delta||0); state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,perf:state.groups[b.group].perf}); }
         if(p==='/api/admin/model'){
           const act=b.action||'save';
           if(act==='test'){
@@ -1528,6 +1547,7 @@ const server=http.createServer(async (req,res)=>{
           save(); return send(res,200,{ok:true});
         }
         if(p==='/api/admin/scoreai'){
+          if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
           const sub=state.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'});
           const rr=await aiScoreSubmission(sub,b.rubric||[],b.task||'');
@@ -1535,6 +1555,7 @@ const server=http.createServer(async (req,res)=>{
           save(); return send(res,200,{ok:true,score:rr.score});
         }
         if(p==='/api/admin/rescore'){
+          if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
           const items=Array.isArray(b.items)?b.items:[];
           if(!items.length) return send(res,400,{ok:false,error:'没有可重评的提交'});
@@ -1548,7 +1569,7 @@ const server=http.createServer(async (req,res)=>{
           state.updatedAt=new Date().toISOString();save();
           return send(res,200,{ok:true,scored:scored,failed:failed,remaining:Math.max(0,items.length-queue.length)});
         }
-        if(p==='/api/admin/score'){ const sub=state.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'}); if(b.manual) sub.manual=b.manual; if(b.score) sub.score=b.score; save(); return send(res,200,{ok:true}); }
+        if(p==='/api/admin/score'){ if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'}); const sub=state.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'}); if(b.manual) sub.manual=b.manual; if(b.score) sub.score=b.score; save(); return send(res,200,{ok:true}); }
         /* score 可含 override 字段：人工直接定总分 */
         if(p==='/api/admin/reset'){ if(b.scope==='poll'){ state.poll={active:false,question:'',options:[],votes:{},startedAt:''}; } else if(b.scope==='groups'){ Object.values(state.students).forEach(s=>s.group=''); } else { const _m=state.config&&state.config.model; state=blank(); if(_m)state.config.model=_m; } save(); return send(res,200,{ok:true}); }
       }

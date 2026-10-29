@@ -96,13 +96,13 @@ body{animation:pageIn .32s ease both}
     </div>
 
     <div class="card" id="groupCard">
-      <div class="k">我的小组</div>
+      <div class="k" id="groupTitle">我的小组</div>
       <div id="groupNone">
         <p class="small" style="margin-bottom:10px">三人一组，抽到的字母就是你的组，全天不变。</p>
         <button class="btn" id="drawBtn">抽签</button>
       </div>
       <div id="groupGot" class="hidden">
-        <div class="groupbox"><div class="letter" id="gLetter">A</div><div class="gtext" id="gText"></div><div class="score"><b id="gScore">0</b><span>小组积分</span></div></div>
+        <div class="groupbox"><div class="letter" id="gLetter">A</div><div class="gtext" id="gText"></div><div class="score"><b id="gScore">0</b><span id="gScoreLabel">小组积分</span></div></div>
       </div>
     </div>
 
@@ -211,9 +211,12 @@ function renderHw(){
   var open=!!(stateData&&stateData.hwOpen);
   $('hwCard').style.display=open?'':'none';
   if(!open)return;
-  $('hwGroup').textContent=stateData&&stateData.me&&stateData.me.group?('我的小组 '+stateData.me.group):'未分组';
-  $('hwTitle').textContent=(stateData&&stateData.me&&stateData.me.group?stateData.me.group+' 小组 · ':'')+'作业提交';
-  $('hwList').innerHTML=HWS.map(function(h){
+  var _grp=stateData&&stateData.me&&stateData.me.group;
+  var _groupsOn=!(stateData&&stateData.groupsEnabled===false);
+  $('hwGroup').textContent=_grp?('我的小组 '+_grp):(_groupsOn?'未分组':'个人提交');
+  $('hwTitle').textContent=(_grp?(_grp+' 小组 · '):(_groupsOn?'':'个人 · '))+'作业提交';
+  var _hwLimit=Math.max(1,Math.min(6,Number(stateData&&stateData.hwCount)||6));
+  $('hwList').innerHTML=HWS.slice(0,_hwLimit).map(function(h){
     var s=subs[h.id];
     var ok=s&&s.files&&s.files.length>0;
     var p=pending.filter(function(x){return x.task===h.id}).length;
@@ -286,7 +289,8 @@ $('hwConfirm').addEventListener('click',async function(){
   if(fails)alert(fails+' 个文件上传失败，请重试');
 });
 function renderWs(){
-  $('wsList').innerHTML=WS.map(function(w){
+  var _wsLimit=Math.max(1,Math.min(6,Number(stateData&&stateData.hwCount)||6));
+  $('wsList').innerHTML=WS.slice(0,_wsLimit).map(function(w){
     return '<div class="ws"><div class="ws-h"><b>'+w.t+'</b><span class="pill">'+w.p+'</span></div>'+
       '<div class="ws-row"><b>输入</b><span>'+w.inp+'</span></div>'+
       '<div class="ws-row"><b>动作</b><span>'+w.act+'</span></div>'+
@@ -299,8 +303,15 @@ function render(){
   if(!stateData||!stateData.me)return;
   var m=stateData.me;
   $('mName').textContent=m.name;$('mTail').textContent='尾号 '+m.tail;
-  if($('gScore'))$('gScore').textContent=Number(m.groupScore||m.score||0);
-  if(m.group){
+  var groupsOn=stateData.groupsEnabled!==false;
+  if($('gScore'))$('gScore').textContent=Number(groupsOn?(m.groupScore||m.score||0):(m.individualScore||0));
+  if($('gScoreLabel'))$('gScoreLabel').textContent=groupsOn?'小组积分':'个人积分';
+  var drawBtn=$('drawBtn'); if(drawBtn)drawBtn.style.display=groupsOn?'':'none';
+  var gt=$('groupTitle'); if(gt)gt.textContent=groupsOn?'我的小组':'我的计分';
+  if(!groupsOn){
+    $('groupNone').classList.add('hidden');$('groupGot').classList.remove('hidden');
+    $('gLetter').textContent='个'; $('gText').innerHTML='<b>个人计分</b><br />答题 + 作业';
+  }else if(m.group){
     $('groupNone').classList.add('hidden');$('groupGot').classList.remove('hidden');
     $('gLetter').textContent=m.group;
     $('gText').innerHTML='你是 <b>'+m.group+' 组</b><br />三人一组，成果一起算分';

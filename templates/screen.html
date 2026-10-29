@@ -27,6 +27,17 @@ body{background:#0E0E10;color:#F4F4F5;font-family:Inter,'PingFang SC','Microsoft
 .ws-card .attrs{color:#A1A1AA;font-size:.85em;margin-top:6px}
 .ws-empty{color:#6B6B76;font-size:clamp(14px,1.4vw,20px)}
 .ws-foot{font-size:12px;color:#6B6B76;letter-spacing:.08em}
+.pollview{position:absolute;inset:0;z-index:2;display:none;flex-direction:column;justify-content:center;padding:5vh 7vw;background:radial-gradient(120% 90% at 50% 0,#1A3328,#0E0E10 62%)}
+.pollview.show{display:flex}
+.poll-kicker{font-size:12px;letter-spacing:.3em;color:#6B6B76;margin-bottom:2vh}
+.poll-q{font-size:clamp(24px,3.5vw,54px);font-weight:800;line-height:1.35;color:#F4F4F5;margin-bottom:5vh;max-width:1200px}
+.poll-bars{display:flex;flex-direction:column;gap:1.8vh;max-width:1200px}
+.poll-row{display:flex;flex-direction:column;gap:6px}
+.poll-row .lab{display:flex;justify-content:space-between;font-size:clamp(14px,1.5vw,22px);color:#D4D4D8}
+.poll-row .lab b{font-variant-numeric:tabular-nums;color:#CBF74E}
+.poll-track{height:clamp(14px,1.6vw,24px);border-radius:99px;background:#27272A;overflow:hidden}
+.poll-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#9EDC2F,#CBF74E);transition:width .5s ease}
+.poll-meta{font-size:clamp(13px,1.3vw,18px);color:#A1A1AA;margin-top:3vh}
 </style></head><body>
 <div class="top">
   <div class="brand">YSCOT · 授课大屏</div>
@@ -41,6 +52,12 @@ body{background:#0E0E10;color:#F4F4F5;font-family:Inter,'PingFang SC','Microsoft
   <div class="ws-card" id="wsCard"><span class="ws-empty">暂无行动卡 / 场景卡</span></div>
   <div class="ws-foot">遥控器 → 工作坊 → 开始计时 / 推送行动卡</div>
 </div>
+  <div class="pollview" id="pollView">
+    <div class="poll-kicker">YSCOT · 投票结果</div>
+    <div class="poll-q" id="pollQ">暂无投票</div>
+    <div class="poll-bars" id="pollBars"></div>
+    <div class="poll-meta" id="pollMeta"></div>
+  </div>
   <div class="empty" id="empty"><b id="emptyTitle">还没有内容</b><span id="emptyMsg"></span></div>
 </div>
 <script>
@@ -68,6 +85,19 @@ function showWorkshop(d){
   else{ box.innerHTML='<span class="ws-empty">暂无行动卡 / 场景卡</span>'; }
   tickClock();
 }
+function showPoll(d){
+  var pv=document.getElementById('pollView'), f=document.getElementById('viewFrame'), e=document.getElementById('empty');
+  pv.classList.add('show'); f.style.display='none'; e.classList.remove('show');
+  var p=d.poll||{}, opts=p.options||[], res=p.results||{}, total=Number(p.count)||0;
+  document.getElementById('pollQ').textContent=p.question||'暂无投票';
+  var max=1; opts.forEach(function(o,i){max=Math.max(max,Number(res[i]||0))});
+  document.getElementById('pollBars').innerHTML=opts.length?opts.map(function(o,i){
+    var n=Number(res[i]||0), pct=total?Math.round(n/total*100):0, w=Math.round(n/max*100);
+    return '<div class="poll-row"><div class="lab"><span>'+esc(o)+'</span><span><b>'+n+'</b> 票 · '+pct+'%</span></div><div class="poll-track"><div class="poll-fill" style="width:'+w+'%"></div></div></div>';
+  }).join(''):'<div class="poll-meta">还没有投票选项</div>';
+  document.getElementById('pollMeta').textContent='已投 '+total+' 人'+(p.active?' · 进行中':' · 已结束');
+}
+function hidePoll(){ document.getElementById('pollView').classList.remove('show'); }
 function hideWorkshop(){ document.getElementById('workshopView').classList.remove('show'); }
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
 function pad(n){return n<10?'0'+n:''+n}
@@ -86,8 +116,9 @@ setInterval(tickClock,250);
 function refresh(){
   fetch('/api/screen?room='+room,{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
     var view=d.screenView||'data';
-    if(view==='workshop'){ showWorkshop(d); return; }
-    hideWorkshop();
+    if(view==='poll'){ hideWorkshop(); showPoll(d); return; }
+    if(view==='workshop'){ hidePoll(); showWorkshop(d); return; }
+    hideWorkshop(); hidePoll();
     if(view==='course'){
       setFrame('/course-screen?room='+room+'&embed=1','','');
     }else{
