@@ -88,6 +88,8 @@ function canMcpRoom(t, code){
 let currentRoom = DEFAULT_ROOM;
 function roomStateFile(code){ return code===DEFAULT_ROOM ? STATE_FILE : path.join(ROOMS_DIR, code, 'state.json'); }
 function roomMetaFile(code){ return code===DEFAULT_ROOM ? path.join(DATA_DIR, 'room.json') : path.join(ROOMS_DIR, code, 'room.json'); }
+const ROOM_META_CACHE={};
+function cachedRoomMeta(code){ const n=Date.now(), c=ROOM_META_CACHE[code]; if(c&&n-c.at<3000)return c.data; let data={}; try{ data=JSON.parse(fs.readFileSync(roomMetaFile(code),'utf8')); }catch(e){} ROOM_META_CACHE[code]={at:n,data:data}; return data; }
 function validRoom(c){ return /^[A-Z0-9]{4}$/.test(String(c||'')); }
 function loadRoom(code){
   const f=roomStateFile(code);
@@ -214,12 +216,12 @@ function studentView(k){
     poll: poll.active?{active:true,question:poll.question,options:poll.options,voted,myVote:voted?poll.votes[k]:null,startedAt:poll.startedAt}:{active:false},
     hwOpen: !!(state.config&&state.config.hwOpen),
     workshopOpen: !!(state.config&&state.config.workshopOpen),
-    tasksVersion:(function(){try{return fs.statSync(path.join(DATA_DIR,'rooms',currentRoom,'assets','quests.html')).mtimeMs}catch(e){return 0}})(),
+    tasksVersion:(state.tasks&&state.tasks.length)?(function(){try{return fs.statSync(path.join(DATA_DIR,'rooms',currentRoom,'assets','quests.html')).mtimeMs}catch(e){return 0}})():0,
     tasksCount:(state.tasks||[]).length,
     roll:(function(){var r=state.roll||{};return {active:!!r.active,name:r.name||'',selected:!!(r.active&&r.key===k)};})(),
     card:(function(){ if(!(state.config&&state.config.workshopOpen)) return null; var c=(state.cards||[]).filter(function(x){return x.id===state.config.activeCard})[0]; return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null; })(),
     materialOpen:!!(state.config&&state.config.materialOpen),
-    materials:(function(){var out=[];try{var m=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8'));out=(m.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
+    materials:(function(){var out=[];try{var m=cachedRoomMeta(currentRoom);out=(m.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
@@ -232,7 +234,7 @@ function studentView(k){
 
 function remoteView(){
   const cfg=state.config||{}, poll=state.poll||{}, buzz=state.buzz||{}, quiz=state.quiz||{};
-  let roomTitle=''; try{ roomTitle=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')).title||''; }catch(e){}
+  let roomTitle=''; try{ roomTitle=cachedRoomMeta(currentRoom).title||''; }catch(e){}
   const paper=quiz.paper||{}, timer=state.timer||{}, roll=state.roll||{};
   const groups=Object.keys(state.groups||{}).map(function(g){return {id:g,name:(state.groups[g]&&state.groups[g].name)||g,perf:Number((state.groups[g]&&state.groups[g].perf)||0)}});
   const cards=(state.cards||[]).map(function(c){return {id:c.id,theme:c.theme,type:c.type}});
@@ -786,7 +788,7 @@ function screenView(){
   const quiz=state.quiz||{};
   const paper=quiz.paper;
   const cfg=state.config||{};
-  let _meta={}; try{ _meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
+  let _meta=cachedRoomMeta(currentRoom);
   const _tasks=(state.tasks&&state.tasks.length)?state.tasks:[{id:'T1',title:'活动策划方案'},{id:'T2',title:'表格协作'},{id:'T3',title:'汇报与推介 PPT'},{id:'T4',title:'对外宣传'},{id:'T5',title:'项目协作'},{id:'T6',title:'对外核对'}];
   const _subs=Object.keys(state.submissions||{}).map(function(k){
     const p=k.split('||'); const st=state.students[p[0]]||{}; const sub=state.submissions[k]||{};
