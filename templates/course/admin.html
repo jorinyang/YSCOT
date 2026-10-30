@@ -272,6 +272,7 @@ function render(){
   document.getElementById('quizBank').textContent='题库：'+(qz.bank.choice||0)+' / '+(qz.bank.judge||0)+' / '+(qz.bank.blank||0)+' / '+(qz.bank.short||0);
   document.getElementById('quizStat').textContent=qz.paper&&qz.paper.active?('进行中 · '+qz.paper.count+' 题 / '+qz.paper.points+' 分 · 已答 '+qz.answered+' 人 · 均分 '+qz.avg):(qz.paper?('已结束 · 参与 '+qz.answered+' 人 · 均分 '+qz.avg):'未发布');
   var qcfg=qz.config||{};
+  /* 题量/分值是讲师草稿，不能被 4 秒轮询覆盖；发布后才同步（峰林版同类修复） */
   if(!quizFormInit||!quizFormDirty){
     document.getElementById('quizMode').value=qcfg.mode||'random';
     ['choice','judge','blank','short'].forEach(function(t){
