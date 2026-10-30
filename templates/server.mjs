@@ -1621,9 +1621,9 @@ const server=http.createServer(async (req,res)=>{
           if(act==='test'){
             const cfg={baseUrl:(b.baseUrl||'').trim(),model:(b.model||'').trim(),apiKey:(b.apiKey||'').trim()||(state.config.model&&state.config.model.apiKey)||process.env.DEEPSEEK_API_KEY||''};
             if(!cfg.apiKey) return send(res,400,{ok:false,error:'请先填写 API Key'});
-            const old=state.config.model; state.config.model=cfg;
+            const _st=state; const old=_st.config.model; _st.config.model=cfg;
             const r=await modelChat([{role:'user',content:'只回复两个字母：OK'}],20);
-            state.config.model=old;
+            _st.config.model=old;
             if(!r.ok) return send(res,502,{ok:false,error:r.error});
             return send(res,200,{ok:true,reply:String(r.content).slice(0,40),ms:r.ms,model:r.model});
           }
