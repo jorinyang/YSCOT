@@ -115,6 +115,7 @@ body{animation:pageIn .32s ease both}
   <div class="card" style="margin-top:14px">
     <div class="k">课程素材（发放后学员端可见）</div>
     <div class="rowflex"><input id="matFile" type="file" multiple /><span class="muted small" id="matMsg"></span></div>
+    <div class="rowflex" style="gap:8px;margin-top:8px;align-items:center"><button class="btn sm" id="matSend">发送选中</button><button class="btn sm ghost" id="matWithdraw">撤回选中</button><span class="muted small" id="matBatchMsg"></span></div>
     <div id="matList" class="small" style="margin-top:8px"></div>
   </div>
 
@@ -518,7 +519,9 @@ refresh();setInterval(refresh,2500);
     fetch('/api/rooms',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
       var room=(d.rooms||[]).filter(function(x){return x.code===ROOM})[0]||{}; var fs=room.files||[];
       var ext=window.__extMaterials||[];
-      var items=fs.map(function(f){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0"><a href="'+f.url+'" target="_blank">'+f.name+'</a><button class="btn sm danger" data-mdel="'+encodeURIComponent(f.stored)+'" data-mname="'+encodeURIComponent(f.name)+'">删除</button></div>'}).concat(ext.map(function(f){return '<div><a href="'+f.url+'" target="_blank">'+f.name+'</a> <span class="muted small">外链</span></div>'}));
+      var items=fs.map(function(f){
+        var sent=f.released!==false, status=sent?('已发送'+(f.batch?(' · 第'+f.batch+'批'):'')):'待发送';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><label style="display:flex;align-items:center;gap:7px;min-width:0;flex:1"><input type="checkbox" data-matpick value="'+encodeURIComponent(f.stored)+'" /> <a href="'+f.url+'" target="_blank" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.name+'</a></label><span class="muted small">'+status+'</span><button class="btn sm danger" data-mdel="'+encodeURIComponent(f.stored)+'" data-mname="'+encodeURIComponent(f.name)+'">删除</button></div>'}).concat(ext.map(function(f){return '<div><a href="'+f.url+'" target="_blank">'+f.name+'</a> <span class="muted small">外链</span></div>'}));
       var ml=document.getElementById('matList');
       if(ml){
         ml.innerHTML=items.length?items.join(''):'<span class="muted">还没有素材文件</span>';
@@ -535,11 +538,25 @@ refresh();setInterval(refresh,2500);
     var opts=document.getElementById('vpOpts').value.split('\n').map(function(x){return x.trim()}).filter(Boolean);
     post('/api/admin/votepreset',{action:'add',question:document.getElementById('vpQ').value,options:opts}).then(function(d){document.getElementById('vpMsg').textContent=d.ok?'已添加':(d.error||'失败'); if(d.ok){document.getElementById('vpQ').value='';document.getElementById('vpOpts').value='';} load()});
   };
+  function selectedMaterials(){
+    return [].slice.call(document.querySelectorAll('[data-matpick]:checked')).map(function(x){return decodeURIComponent(x.value)});
+  }
+  function releaseMaterials(open){
+    var arr=selectedMaterials(); if(!arr.length){alert('先勾选要发送的素材');return}
+    post('/api/admin/material-release',{stored:arr,released:!!open}).then(function(d){
+      var msg=document.getElementById('matBatchMsg');
+      if(!d.ok){if(msg)msg.textContent=d.error||'操作失败';return}
+      if(msg)msg.textContent=(open?('已发送 '+d.count+' 个 · 第 '+d.batch+' 批'):('已撤回 '+d.count+' 个'));
+      load();
+    });
+  }
+  document.getElementById('matSend').onclick=function(){ releaseMaterials(true); };
+  document.getElementById('matWithdraw').onclick=function(){ releaseMaterials(false); };
   document.getElementById('matFile').onchange=function(){
     var files=[].slice.call(this.files||[]); var msg=document.getElementById('matMsg'); msg.textContent='上传中…';
     Promise.all(files.map(function(f){return new Promise(function(res){
-      var fr=new FileReader(); fr.onload=function(){ var b64=String(fr.result).split(',')[1]||''; post('/api/room/upload?room='+ROOM,{filename:f.name,data:b64}).then(res); }; fr.readAsDataURL(f);
-    })})).then(function(){msg.textContent='已上传';load();});
+      var fr=new FileReader(); fr.onload=function(){ var b64=String(fr.result).split(',')[1]||''; post('/api/room/upload?room='+ROOM,{filename:f.name,data:b64,material:true}).then(res); }; fr.readAsDataURL(f);
+    })})).then(function(){msg.textContent='已上传，勾选后发送';load();});
   };
   document.getElementById('cardAdd').onclick=function(){ var theme=document.getElementById('cardTheme').value.trim(); if(!theme){document.getElementById('cardMsg').textContent='主题必填';return} post('/api/admin/cards',{action:'add',theme:theme,type:document.getElementById('cardType').value,content:document.getElementById('cardContent').value,attrs:document.getElementById('cardAttrs').value}).then(function(d){ if(d.ok){document.getElementById('cardTheme').value='';document.getElementById('cardContent').value='';document.getElementById('cardAttrs').value='';document.getElementById('cardMsg').textContent='已添加';load();}else document.getElementById('cardMsg').textContent=d.error||'失败'; }); };
   setInterval(load,4000); load();

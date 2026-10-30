@@ -222,7 +222,7 @@ function studentView(k){
     roll:(function(){var r=state.roll||{};return {active:!!r.active,name:r.name||'',selected:!!(r.active&&r.key===k)};})(),
     card:(function(){ if(!(state.config&&state.config.workshopOpen)) return null; var c=(state.cards||[]).filter(function(x){return x.id===state.config.activeCard})[0]; return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null; })(),
     materialOpen:!!(state.config&&state.config.materialOpen),
-    materials:(function(){var out=[];try{var m=cachedRoomMeta(currentRoom);out=(m.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
+    materials:(function(){var out=[];try{var m=cachedRoomMeta(currentRoom);out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
@@ -1013,7 +1013,7 @@ const server=http.createServer(async (req,res)=>{
       const dir=roomUploadDir(currentRoom);
       fs.writeFileSync(path.join(dir,stored),buf);
       let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
-      meta.files=meta.files||[]; meta.files.push({name:raw,stored,size:buf.length,type:ext,at:new Date().toISOString()});
+      meta.files=meta.files||[]; meta.files.push({name:raw,stored,size:buf.length,type:ext,at:new Date().toISOString(),released:!b.material,batch:0});
       fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
       clearRoomMetaCache(currentRoom);
     return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom)});
@@ -1544,6 +1544,20 @@ const server=http.createServer(async (req,res)=>{
           return send(res,200,{ok:true,list:state.cards});
         }
         if(p==='/api/admin/material'){ state.config=state.config||{}; state.config.materialOpen=!!b.open; save(); return send(res,200,{ok:true,materialOpen:state.config.materialOpen}); }
+        if(p==='/api/admin/material-release'){
+          const stored=(Array.isArray(b.stored)?b.stored:[b.stored]).map(String).filter(Boolean);
+          if(!stored.length) return send(res,400,{ok:false,error:'先选择素材'});
+          let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
+          const files=meta.files||[]; let matched=0; const released=!!b.released;
+          const batch=released?((Number(state.config&&state.config.materialBatch)||0)+1):0;
+          files.forEach(function(f){ if(stored.indexOf(f.stored)<0)return; matched++; f.released=released; f.releasedAt=released?new Date().toISOString():''; f.batch=released?batch:(f.batch||0); });
+          if(!matched) return send(res,404,{ok:false,error:'没有匹配的素材'});
+          meta.files=files; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
+          clearRoomMetaCache(currentRoom);
+          state.config=state.config||{}; if(released){ state.config.materialOpen=true; state.config.materialBatch=batch; }
+          state.updatedAt=new Date().toISOString(); save();
+          return send(res,200,{ok:true,count:matched,batch:batch,materialOpen:!!state.config.materialOpen});
+        }
         if(p==='/api/admin/screen'){ state.config=state.config||{}; let v=(b.view==='course'||b.view==='workshop'||b.view==='data')?b.view:'data'; if(b.view==='poll'||b.view==='report'||b.view==='stats')v='data'; if(v==='data'){ var tabs=['base','poll','groups','homework','quiz']; var t=String(b.tab||state.config.screenDataTab||'base'); if(b.view==='poll')t='poll'; if(tabs.indexOf(t)>=0)state.config.screenDataTab=t; } state.config.screenView=v; save(); return send(res,200,{ok:true,screenView:v,screenDataTab:state.config.screenDataTab||'base'}); }
         if(p==='/api/admin/slide'){
           state.config=state.config||{}; let n=Number(state.config.slide)||0;
