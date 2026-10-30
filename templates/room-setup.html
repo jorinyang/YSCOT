@@ -68,7 +68,7 @@ input[type=text],input[type=date],select{background:var(--bg2);border:1px solid 
     <p class="hint">上传 html 直接作为课程页面展示；预览使用沙箱，不会读取本系统登录态。</p>
     <div class="row"><input id="htmlFile" type="file" accept=".html,.htm" multiple /><span class="small muted" id="htmlMsg"></span></div>
     <div class="filelist" id="htmlList"></div>
-    <div id="previewWrap"><div class="k" style="margin-top:12px">页面预览</div><iframe id="previewFrame" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer"></iframe></div>
+    <div id="previewWrap"><div class="k" style="margin-top:12px">页面预览</div><iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-forms" referrerpolicy="no-referrer"></iframe></div>
   </div>
 </div>
 
