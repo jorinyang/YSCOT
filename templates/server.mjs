@@ -1358,10 +1358,11 @@ const server=http.createServer(async (req,res)=>{
           state.poll.votes[k]=idx; const _st=state.students[k]; if(_st)_st.votes=(_st.votes||0)+1; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true});
         }
         if(p==='/api/quiz/submit'){
+          const _room=currentRoom,_st=state,_quiz=_st.quiz;
           const k=keyOf(b.name,b.tail); ensureStudent(b.name,b.tail);
-          const pz=state.quiz&&state.quiz.paper;
+          const pz=_quiz&&_quiz.paper;
           if(!pz||!pz.active) return send(res,400,{ok:false,error:'答题未开始'});
-          if(state.quiz.answers[k]) return send(res,400,{ok:false,error:'已经提交过'});
+          if(_quiz.answers[k]) return send(res,400,{ok:false,error:'已经提交过'});
           const qs=quizPaperFor(k);
           const ans=b.answers||{}; let score=0,total=0; const detail=[];
           for(const q of qs){
@@ -1371,8 +1372,8 @@ const server=http.createServer(async (req,res)=>{
             const s=Math.round(ratio*(q.score||0)*10)/10; score+=s;
             detail.push({id:q.id,type:q.type,score:s,ratio:ratio,via:via});
           }
-          state.quiz.answers[k]={at:new Date().toLocaleString('zh-CN'),score:Math.round(score*10)/10,total:total,answers:ans,detail:detail};
-          save();
+          _quiz.answers[k]={at:new Date().toLocaleString('zh-CN'),score:Math.round(score*10)/10,total:total,answers:ans,detail:detail};
+          saveRoom(_room,_st);
           return send(res,200,{ok:true,score:Math.round(score*10)/10,total:total});
         }
         if(p==='/api/homework'){
@@ -1423,6 +1424,7 @@ const server=http.createServer(async (req,res)=>{
           return send(res,200,{ok:true,counts:{choice:state.quiz.bank.choice.length,judge:state.quiz.bank.judge.length,blank:state.quiz.bank.blank.length,short:state.quiz.bank.short.length}});
         }
         if(p==='/api/admin/quizgen' && req.method==='POST'){
+          const _room=currentRoom,_st=state;
           const source=String(b.source||'').trim().slice(0,12000);
           if(!source) return send(res,400,{ok:false,error:'请先粘贴课程大纲或素材'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
@@ -1433,14 +1435,14 @@ const server=http.createServer(async (req,res)=>{
           const added={choice:gen.choice.length,judge:gen.judge.length,blank:gen.blank.length,short:gen.short.length};
           const total=added.choice+added.judge+added.blank+added.short;
           if(!total) return send(res,502,{ok:false,error:'模型返回无法解析：'+(r.text||'').slice(0,180)});
-          state.quiz=state.quiz||{bank:{choice:[],judge:[],blank:[],short:[]},answers:{}};
-          state.quiz.bank=Object.assign({choice:[],judge:[],blank:[],short:[]},state.quiz.bank||{});
+          _st.quiz=_st.quiz||{bank:{choice:[],judge:[],blank:[],short:[]},answers:{}};
+          _st.quiz.bank=Object.assign({choice:[],judge:[],blank:[],short:[]},_st.quiz.bank||{});
           const stamp=Date.now().toString(36);
           ['choice','judge','blank','short'].forEach(function(t){
-            gen[t].forEach(function(q,i){ q.id=t+'-gen-'+stamp+'-'+i; state.quiz.bank[t].push(q); });
+            gen[t].forEach(function(q,i){ q.id=t+'-gen-'+stamp+'-'+i; _st.quiz.bank[t].push(q); });
           });
-          state.updatedAt=new Date().toISOString();save();
-          return send(res,200,{ok:true,added:added,counts:{choice:state.quiz.bank.choice.length,judge:state.quiz.bank.judge.length,blank:state.quiz.bank.blank.length,short:state.quiz.bank.short.length}});
+          _st.updatedAt=new Date().toISOString();saveRoom(_room,_st);
+          return send(res,200,{ok:true,added:added,counts:{choice:_st.quiz.bank.choice.length,judge:_st.quiz.bank.judge.length,blank:_st.quiz.bank.blank.length,short:_st.quiz.bank.short.length}});
         }
         if(p==='/api/admin/quiz'){
           state.quiz=state.quiz||{bank:{choice:[],judge:[],blank:[],short:[]},answers:{}};
@@ -1634,24 +1636,26 @@ const server=http.createServer(async (req,res)=>{
         if(p==='/api/admin/scoreai'){
           if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
-          const sub=state.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'});
+          const _room=currentRoom,_st=state;
+          const sub=_st.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'});
           const rr=await aiScoreSubmission(sub,b.rubric||[],b.task||'');
           if(!rr.ok) return send(res,502,{ok:false,error:rr.error});
-          save(); return send(res,200,{ok:true,score:rr.score});
+          saveRoom(_room,_st); return send(res,200,{ok:true,score:rr.score});
         }
         if(p==='/api/admin/rescore'){
           if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
+          const _room=currentRoom,_st=state;
           const items=Array.isArray(b.items)?b.items:[];
           if(!items.length) return send(res,400,{ok:false,error:'没有可重评的提交'});
           let scored=0; const failed=[];
           const queue=items.slice(0,8);
           for(const it of queue){
-            const sub=state.submissions[it.key];
+            const sub=_st.submissions[it.key];
             const rr=await aiScoreSubmission(sub,it.rubric||[],it.task||'');
             if(rr.ok) scored++; else failed.push({key:it.key,task:it.task||'',error:rr.error||'failed'});
           }
-          state.updatedAt=new Date().toISOString();save();
+          _st.updatedAt=new Date().toISOString();saveRoom(_room,_st);
           return send(res,200,{ok:true,scored:scored,failed:failed,remaining:Math.max(0,items.length-queue.length)});
         }
         if(p==='/api/admin/score'){ if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'}); const sub=state.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'}); if(b.manual) sub.manual=b.manual; if(b.score) sub.score=b.score; save(); return send(res,200,{ok:true}); }
