@@ -30,7 +30,9 @@ const DING_ID = process.env.DINGTALK_CLIENT_ID || '';
 const DING_SECRET = process.env.DINGTALK_CLIENT_SECRET || '';
 function sign(v){ return crypto.createHmac('sha256',SESSION_SECRET).update(v).digest('hex').slice(0,32); }
 function setTeacherCookie(res, teacher){ const v=Buffer.from(JSON.stringify({id:teacher.id,name:teacher.name,role:teacher.role,exp:Date.now()+7*864e5})).toString('base64url'); res.setHeader('Set-Cookie','gtsc_teacher='+v+'.'+sign(v)+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800'); }
-function getTeacher(req){ const raw=String(req.headers.cookie||''); const m=raw.match(/(?:^|;\s*)gtsc_teacher=([^;]+)/); if(!m)return null; const [v,sig]=m[1].split('.'); if(!v||!sig||sign(v)!==sig)return null; try{ const t=JSON.parse(Buffer.from(v,'base64url').toString()); if(!t.exp||t.exp<Date.now())return null; return t; }catch(e){ return null; } }
+function getCookieTeacher(req){ const raw=String(req.headers.cookie||''); const m=raw.match(/(?:^|;\s*)gtsc_teacher=([^;]+)/); if(!m)return null; const [v,sig]=m[1].split('.'); if(!v||!sig||sign(v)!==sig)return null; try{ const t=JSON.parse(Buffer.from(v,'base64url').toString()); if(!t.exp||t.exp<Date.now())return null; return t; }catch(e){ return null; } }
+function bearerToken(req){ const h=String(req.headers.authorization||'').trim(); if(h.toLowerCase().indexOf('bearer ')===0)return h.slice(7).trim(); return String(req.headers['x-mcp-token']||'').trim(); }
+function getTeacher(req){ return getCookieTeacher(req) || teacherByMcpToken(bearerToken(req)); }
 async function dingDept(unionId){
   const corp=process.env.DINGTALK_CORP_ID||'';
   if(!(corp&&DING_ID&&DING_SECRET&&unionId)) return '';
@@ -821,7 +823,7 @@ function screenView(){
     activeCard:(cfg.activeCard||''),activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===cfg.activeCard})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null})()
   };
 }
-function send(res,code,obj,type='application/json; charset=utf-8'){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); res.writeHead(code,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}); res.end(body); }
+function send(res,code,obj,type='application/json; charset=utf-8'){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); res.writeHead(code,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, X-MCP-Token','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}); res.end(body); }
 function readRaw(req, limit){
   return new Promise((resolve,reject)=>{ const chunks=[]; let n=0; const max=limit||8*1024*1024;
     req.on('data',c=>{ n+=c.length; if(n>max){ reject(new Error('too large')); req.destroy(); return; } chunks.push(c); });
@@ -1223,7 +1225,9 @@ const server=http.createServer(async (req,res)=>{
     return send(res,200,fs.readFileSync(file),ct);
   }
   if(AUTH_REQUIRED){
-    const teacher=getTeacher(req);
+    const cookieTeacher=getCookieTeacher(req);
+    const tokenTeacher=cookieTeacher?null:teacherByMcpToken(bearerToken(req));
+    const teacher=cookieTeacher||tokenTeacher;
     let htmlGuarded=(p==='/ops'||p==='/admin'||p==='/grader'||p==='/shell'||p==='/teachers'||p==='/packages'||p==='/report'||p==='/remote'||p==='/package-edit'||p==='/room'||p==='/home'||p==='/room-setup');
     let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown');
     if(p==='/report' && u.searchParams.get('embed')==='1') htmlGuarded=false;
@@ -1231,6 +1235,7 @@ const server=http.createServer(async (req,res)=>{
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;
     if(htmlGuarded&&!teacher){ res.writeHead(302,{Location:'/login'}); return res.end(); }
     if(apiGuarded&&!teacher) return send(res,401,{ok:false,error:'login required'});
+    if(apiGuarded&&tokenTeacher&&tokenTeacher.role!=='admin'){ const _rq=u.searchParams.get('room'); if(_rq){ if(!canMcpRoom(tokenTeacher,currentRoom)) return send(res,403,{ok:false,error:'该 MCP 令牌无权访问这个场次'}); } else if(p.indexOf('/api/admin')===0||p==='/api/report'||p==='/api/report.csv'||p==='/api/room/upload'||p==='/api/room/markdown'){ return send(res,403,{ok:false,error:'使用 MCP 令牌调用后台接口时必须带 ?room=场次码'}); } }
   }
   if(p==='/api/rooms' && req.method==='GET') return send(res,200,{ok:true,rooms:listRooms(getTeacher(req)),current:currentRoom});
   if(p==='/api/rooms/create' && req.method==='POST'){
