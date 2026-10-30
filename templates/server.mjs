@@ -1362,8 +1362,9 @@ const server=http.createServer(async (req,res)=>{
           const pz=state.quiz&&state.quiz.paper;
           if(!pz||!pz.active) return send(res,400,{ok:false,error:'答题未开始'});
           if(state.quiz.answers[k]) return send(res,400,{ok:false,error:'已经提交过'});
+          const qs=quizPaperFor(k);
           const ans=b.answers||{}; let score=0,total=0; const detail=[];
-          for(const q of pz.questions){
+          for(const q of qs){
             total+=q.score||0;
             let ratio=qGrade(q,ans[q.id]); let via='rule';
             if(q.type==='short'){ const m=await qModelGrade(q,ans[q.id]); if(m!==null){ ratio=m/100; via='model'; } }
