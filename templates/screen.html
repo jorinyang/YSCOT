@@ -165,9 +165,10 @@ function basePanel(d){
     '</div>';
 }
 function groupsPanel(d){
-  if(d.groupsEnabled===false){
+  if(d.groupsEnabled!==true){
     var rows=(d.individualTop||[]).map(function(s,i){return '<div class="data-row"><span class="num">'+(i+1)+'</span><span class="name">'+esc(s.name)+' <span class="tag">'+esc(s.tail||'')+'</span></span><span class="tag">个人 '+s.individualScore+' 分 · 抢答 '+s.buzzes+' 次</span></div>'}).join('');
-    return '<div class="data-kicker">YSCOT · 个人计分</div><div class="data-h1">个人积分榜</div><div class="data-sub">分组抽签已关闭，按个人计分</div><div class="data-list">'+(rows||'<div class="data-note">还没有学员</div>')+'</div>';
+    var more=(d.students&&d.individualTop&&d.individualTop.length<d.students)?(' · 展示前 '+d.individualTop.length+' 名'):'';
+    return '<div class="data-kicker">YSCOT · 个人计分</div><div class="data-h1">个人积分榜</div><div class="data-sub">分组抽签已关闭，按个人计分'+more+'</div><div class="data-list">'+(rows||'<div class="data-note">还没有学员</div>')+'</div>';
   }
   var gs=(d.groups||[]).slice().sort(function(a,b){return (b.perf||0)-(a.perf||0)});
   var rows=gs.map(function(g){return '<div class="data-row"><span class="num">'+(g.perf||0)+'</span><span class="name">'+esc(g.id)+' 组 <span class="tag">'+g.count+' 人</span></span><span class="tag">'+esc(g.name||'')+'</span></div>'}).join('');
