@@ -211,7 +211,7 @@ async function api(p,opt){
   return await r.json();
 }
 async function post(p,body){return api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
-var state=null,editingKey=null;
+var state=null,editingKey=null,quizFormInit=false,quizFormDirty=false;
 var _rm=(document.cookie.match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/)||[])[1];
 var ROOM=(new URLSearchParams(location.search).get('room')||_rm||'ROOM0').toUpperCase();
 (function(){var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0&&u.indexOf('room=')<0)u+=(u.indexOf('?')>=0?'&':'?')+'room='+encodeURIComponent(ROOM);return f(u,o)}})();
@@ -272,12 +272,15 @@ function render(){
   document.getElementById('quizBank').textContent='题库：'+(qz.bank.choice||0)+' / '+(qz.bank.judge||0)+' / '+(qz.bank.blank||0)+' / '+(qz.bank.short||0);
   document.getElementById('quizStat').textContent=qz.paper&&qz.paper.active?('进行中 · '+qz.paper.count+' 题 / '+qz.paper.points+' 分 · 已答 '+qz.answered+' 人 · 均分 '+qz.avg):(qz.paper?('已结束 · 参与 '+qz.answered+' 人 · 均分 '+qz.avg):'未发布');
   var qcfg=qz.config||{};
-  if(document.activeElement!==document.getElementById('quizMode')) document.getElementById('quizMode').value=qcfg.mode||'random';
-  ['choice','judge','blank','short'].forEach(function(t){
-    var c=document.getElementById('qc-'+t), sc=document.getElementById('qs-'+t);
-    if(c&&document.activeElement!==c)c.value=(qcfg.counts&&qcfg.counts[t]!==undefined)?qcfg.counts[t]:c.value;
-    if(sc&&document.activeElement!==sc)sc.value=(qcfg.scores&&qcfg.scores[t]!==undefined)?qcfg.scores[t]:sc.value;
-  });
+  if(!quizFormInit||!quizFormDirty){
+    document.getElementById('quizMode').value=qcfg.mode||'random';
+    ['choice','judge','blank','short'].forEach(function(t){
+      var c=document.getElementById('qc-'+t), sc=document.getElementById('qs-'+t);
+      if(c)c.value=(qcfg.counts&&qcfg.counts[t]!==undefined)?qcfg.counts[t]:c.value;
+      if(sc)sc.value=(qcfg.scores&&qcfg.scores[t]!==undefined)?qcfg.scores[t]:sc.value;
+    });
+    quizFormInit=true;
+  }
   /* 抢答控制与结果显示在遥控器 */
   /* 学员管理 */
   var gopts=function(cur){return ['','A','B','C','D','E','F','G'].map(function(g){return '<option value="'+g+'" '+(cur===g?'selected':'')+'>'+(g||'未分')+'</option>'}).join('')};
@@ -375,13 +378,17 @@ function bind(){
     }catch(e){alert('生成失败：'+(e.message||e));document.getElementById('quizGenMsg').textContent=''}
     finally{btn.disabled=false;btn.textContent='AI 生成题库'}
   });
+  ['quizMode','qc-choice','qc-judge','qc-blank','qc-short','qs-choice','qs-judge','qs-blank','qs-short'].forEach(function(id){
+    var el=document.getElementById(id); if(!el)return;
+    el.addEventListener(el.tagName==='SELECT'?'change':'input',function(){quizFormDirty=true;});
+  });
   var qp=document.getElementById('quizPublish');
   if(qp)qp.addEventListener('click',async function(){
     var counts={},scores={};
     ['choice','judge','blank','short'].forEach(function(t){counts[t]=Number(document.getElementById('qc-'+t).value)||0;scores[t]=Number(document.getElementById('qs-'+t).value)||0});
     if(!counts.choice&&!counts.judge&&!counts.blank&&!counts.short){alert('至少设置一类题数量');return}
     await post('/api/admin/quiz',{action:'publish',mode:document.getElementById('quizMode').value,counts:counts,scores:scores});
-    refresh();
+    quizFormDirty=false; refresh();
   });
   var qc=document.getElementById('quizClose');
   if(qc)qc.addEventListener('click',async function(){await post('/api/admin/quiz',{action:'close'});refresh()});
