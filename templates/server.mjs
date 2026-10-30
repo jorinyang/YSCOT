@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { renderCoursePackage } from './course-render.mjs';
@@ -87,7 +88,10 @@ function canMcpRoom(t, code){
   try{ const meta=JSON.parse(fs.readFileSync(roomMetaFile(code),'utf8')); return !!(meta&&meta.owner&&String(meta.owner)===String(t.id)); }catch(e){ return false; }
 }
 
-let currentRoom = DEFAULT_ROOM;
+let legacyRoom = DEFAULT_ROOM;
+const requestCtx = new AsyncLocalStorage();
+function ctxRoom(){ const c=requestCtx.getStore(); return (c&&c.room)?c.room:legacyRoom; }
+function ctxState(){ const c=requestCtx.getStore(); return (c&&c.state)?c.state:legacyState; }
 function roomStateFile(code){ return code===DEFAULT_ROOM ? STATE_FILE : path.join(ROOMS_DIR, code, 'state.json'); }
 function roomMetaFile(code){ return code===DEFAULT_ROOM ? path.join(DATA_DIR, 'room.json') : path.join(ROOMS_DIR, code, 'room.json'); }
 const ROOM_META_CACHE={};
@@ -125,7 +129,14 @@ function createRoom(title, city, date, owner, province, project){
   return code;
 }
 const roomCache={};
-function setRoom(code){ currentRoom = validRoom(code) ? code : DEFAULT_ROOM; state = roomCache[currentRoom] || (roomCache[currentRoom] = loadRoom(currentRoom)); }
+function enterRoom(code){
+  const room=validRoom(code)?code:DEFAULT_ROOM;
+  const st=roomCache[room]||(roomCache[room]=loadRoom(room));
+  legacyRoom=room; legacyState=st;
+  const c=requestCtx.getStore();
+  if(c){ c.room=room; c.state=st; } else { requestCtx.enterWith({room:room,state:st}); }
+}
+function setRoom(code){ enterRoom(code); }
 function cookieRoom(req){ const m=String(req.headers.cookie||'').match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/); return m?m[1]:''; }
 
 function ensureDir(){ if(!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR,{recursive:true}); }
@@ -135,14 +146,22 @@ function blank(){
 }
 function load(){ ensureDir(); if(!fs.existsSync(STATE_FILE)) return blank();
   try{ const s=JSON.parse(fs.readFileSync(STATE_FILE,'utf8')); return Object.assign(blank(),s); }catch(e){ return blank(); } }
-let state = loadRoom(DEFAULT_ROOM);
+let legacyState = loadRoom(DEFAULT_ROOM);
+const state = new Proxy({}, {
+  get:function(_t,p){ const st=ctxState(); return st?Reflect.get(st,p):undefined; },
+  set:function(_t,p,v){ const st=ctxState(); if(!st)return false; Reflect.set(st,p,v); return true; },
+  has:function(_t,p){ return p in ctxState(); },
+  ownKeys:function(){ return Reflect.ownKeys(ctxState()); },
+  getOwnPropertyDescriptor:function(_t,p){ const d=Object.getOwnPropertyDescriptor(ctxState(),p); return d||{configurable:true,enumerable:true,writable:true,value:ctxState()[p]}; },
+  deleteProperty:function(_t,p){ return delete ctxState()[p]; }
+});
 try{
   state.config=state.config||{};
   if(!state.config.model) state.config.model={baseUrl:'https://api.deepseek.com',model:'deepseek-flash',apiKey:''};
   if(!state.config.model.apiKey && process.env.DEEPSEEK_API_KEY){ state.config.model.baseUrl=process.env.DEEPSEEK_BASE||'https://api.deepseek.com'; state.config.model.model=process.env.DEEPSEEK_MODEL||'deepseek-flash'; state.config.model.apiKey=process.env.DEEPSEEK_API_KEY; }
 }catch(e){}
 let saveTimer=null;
-function save(){ clearTimeout(saveTimer); const room=currentRoom; try{ saveRoom(room, state); }catch(e){ console.error('save fail',e.message); } }
+function save(){ clearTimeout(saveTimer); const room=ctxRoom(); try{ saveRoom(room, state); }catch(e){ console.error('save fail',e.message); } }
 function groupsOn(){ return !(state.config&&state.config.groupsEnabled===false); }
 function reviewOn(){ return !(state.config&&state.config.reviewEnabled===false); }
 function hwCountOn(){ return Math.max(1,Math.min(6,Number(state.config&&state.config.hwCount)||6)); }
@@ -213,18 +232,18 @@ function studentView(k){
   const _groupsOn=groupsOn();
   return {
     ok:true,
-    room: currentRoom,
+    room: ctxRoom(),
     me: s?{name:s.name,tail:s.tail,group:s.group,score:_groupsOn?groupScore:_personalScore,groupPerf:groupPerf,groupScore:groupScore,individualScore:_personalScore,hwScore:_hwScore,quizScore:_quizScore}:null,
     groupsEnabled:_groupsOn,reviewEnabled:reviewOn(),hwCount:hwCountOn(),
     poll: poll.active?{active:true,question:poll.question,options:poll.options,voted,myVote:voted?poll.votes[k]:null,startedAt:poll.startedAt}:{active:false},
     hwOpen: !!(state.config&&state.config.hwOpen),
     workshopOpen: !!(state.config&&state.config.workshopOpen),
-    tasksVersion:(state.tasks&&state.tasks.length)?(function(){try{return fs.statSync(path.join(DATA_DIR,'rooms',currentRoom,'assets','quests.html')).mtimeMs}catch(e){return 0}})():0,
+    tasksVersion:(state.tasks&&state.tasks.length)?(function(){try{return fs.statSync(path.join(DATA_DIR,'rooms',ctxRoom(),'assets','quests.html')).mtimeMs}catch(e){return 0}})():0,
     tasksCount:(state.tasks||[]).length,
     roll:(function(){var r=state.roll||{};return {active:!!r.active,name:r.name||'',selected:!!(r.active&&r.key===k)};})(),
     card:(function(){ if(!(state.config&&state.config.workshopOpen)) return null; var c=(state.cards||[]).filter(function(x){return x.id===state.config.activeCard})[0]; return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null; })(),
     materialOpen:!!(state.config&&state.config.materialOpen),
-    materials:(function(){var out=[];try{var m=cachedRoomMeta(currentRoom);out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
+    materials:(function(){var out=[];try{var m=cachedRoomMeta(ctxRoom());out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(ctxRoom())}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
@@ -237,13 +256,13 @@ function studentView(k){
 
 function remoteView(){
   const cfg=state.config||{}, poll=state.poll||{}, buzz=state.buzz||{}, quiz=state.quiz||{};
-  let roomTitle=''; try{ roomTitle=cachedRoomMeta(currentRoom).title||''; }catch(e){}
+  let roomTitle=''; try{ roomTitle=cachedRoomMeta(ctxRoom()).title||''; }catch(e){}
   const paper=quiz.paper||{}, timer=state.timer||{}, roll=state.roll||{};
   const groups=Object.keys(state.groups||{}).map(function(g){return {id:g,name:(state.groups[g]&&state.groups[g].name)||g,perf:Number((state.groups[g]&&state.groups[g].perf)||0)}});
   const cards=(state.cards||[]).map(function(c){return {id:c.id,theme:c.theme,type:c.type}});
   const active=(state.cards||[]).filter(function(c){return c.id===cfg.activeCard})[0]||null;
   return {
-    ok:true,room:currentRoom,title:roomTitle,materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),screenView:cfg.screenView||'data',screenDataTab:cfg.screenDataTab||'base',
+    ok:true,room:ctxRoom(),title:roomTitle,materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),screenView:cfg.screenView||'data',screenDataTab:cfg.screenDataTab||'base',
     screenView:cfg.screenView||'data',workshopOpen:!!cfg.workshopOpen,
     groups:groups,
     roll:{active:!!roll.active,name:roll.name||'',round:roll.round||0},
@@ -528,7 +547,7 @@ async function mcpHandle(msg, mcpTeacher){
           let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(room),'utf8')); }catch(e){}
           meta.files=meta.files||[]; meta.files.push({name:nm,stored:stored,size:buf.length,type:String(a.type||raw.split('.').pop()||''),at:new Date().toISOString()});
           fs.writeFileSync(roomMetaFile(room),JSON.stringify(meta,null,1));
-          return reply({content:[{type:'text',text:JSON.stringify({ok:true,name:nm,stored:stored,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom),size:buf.length})}]});
+          return reply({content:[{type:'text',text:JSON.stringify({ok:true,name:nm,stored:stored,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(ctxRoom()),size:buf.length})}]});
         }
         if(a.url){
           const uu=String(a.url); if(!/^https?:\/\//i.test(uu)) return reply({isError:true,content:[{type:'text',text:'url 必须是 http(s)'}]});
@@ -560,7 +579,7 @@ async function mcpHandle(msg, mcpTeacher){
         state.rubrics=state.rubrics||{}; state.rubrics[task]=items.map(function(x){return {t:String(x.t||''),pts:Number(x.pts)||0,desc:String(x.desc||'')}}); save();
         return reply({content:[{type:'text',text:JSON.stringify({ok:true,task:task,count:items.length})}]});
       }
-      if(name==='report.export'){ return reply({content:[{type:'text',text:JSON.stringify({room:currentRoom,students:Object.keys(state.students).length,groups:screenView().groups,quiz:screenView().quiz,poll:screenView().poll})}]}); }
+      if(name==='report.export'){ return reply({content:[{type:'text',text:JSON.stringify({room:ctxRoom(),students:Object.keys(state.students).length,groups:screenView().groups,quiz:screenView().quiz,poll:screenView().poll})}]}); }
       if(name==='screen.url'){ return reply({content:[{type:'text',text:JSON.stringify({url:'/screen?room='+room})}]}); }
       return reply({isError:true,content:[{type:'text',text:'unknown tool '+name}]});
     }catch(e){ return reply({isError:true,content:[{type:'text',text:String(e.message||e)}]}); }
@@ -799,7 +818,7 @@ function screenView(){
   const quiz=state.quiz||{};
   const paper=quiz.paper;
   const cfg=state.config||{};
-  let _meta=cachedRoomMeta(currentRoom);
+  let _meta=cachedRoomMeta(ctxRoom());
   const _tasks=(state.tasks&&state.tasks.length)?state.tasks:[{id:'T1',title:'活动策划方案'},{id:'T2',title:'表格协作'},{id:'T3',title:'汇报与推介 PPT'},{id:'T4',title:'对外宣传'},{id:'T5',title:'项目协作'},{id:'T6',title:'对外核对'}];
   const _subs=Object.keys(state.submissions||{}).map(function(k){
     const p=k.split('||'); const st=state.students[p[0]]||{}; const sub=state.submissions[k]||{};
@@ -818,11 +837,11 @@ function screenView(){
   const _indivTop=_students.slice().sort(function(a,b){return b.individualScore-a.individualScore||b.buzzes-a.buzzes}).slice(0,12);
   const _quizTop=Object.keys(quiz.answers||{}).map(function(k){const a=quiz.answers[k]||{};const st=state.students[k]||{};return {name:st.name||k,tail:st.tail||'',score:a.score||0,total:a.total||0};}).sort(function(a,b){return b.score-a.score}).slice(0,12);
   const _quizVals=Object.values(quiz.answers||{});
-  return {ok:true,room:currentRoom,title:_meta.title||('课堂 '+currentRoom),at:Date.now(),groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),screenView:(cfg.screenView)||'data',screenDataTab:(function(){var t=String(cfg.screenDataTab||'base');return ['base','poll','groups','homework','quiz'].indexOf(t)>=0?t:'base'})(),slide:cfg.slide||0,packageId:_meta.packageId||'',materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,workshopOpen:!!cfg.workshopOpen,
-    meta:{title:_meta.title||('课堂 '+currentRoom),date:_meta.date||'',city:_meta.city||'',province:_meta.province||'',project:_meta.project||''},
+  return {ok:true,room:ctxRoom(),title:_meta.title||('课堂 '+ctxRoom()),at:Date.now(),groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),screenView:(cfg.screenView)||'data',screenDataTab:(function(){var t=String(cfg.screenDataTab||'base');return ['base','poll','groups','homework','quiz'].indexOf(t)>=0?t:'base'})(),slide:cfg.slide||0,packageId:_meta.packageId||'',materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,workshopOpen:!!cfg.workshopOpen,
+    meta:{title:_meta.title||('课堂 '+ctxRoom()),date:_meta.date||'',city:_meta.city||'',province:_meta.province||'',project:_meta.project||''},
     groups:Object.keys(state.groups||{}).map(function(g){return {id:g,name:state.groups[g].name,perf:state.groups[g].perf||0,count:_students.filter(function(s){return s.group===g}).length}}),
     students:_students.length,individualTop:_indivTop,
-    files:(_meta.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(currentRoom)}}),
+    files:(_meta.files||[]).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(ctxRoom())}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     poll:{active:!!poll.active,question:poll.question||'',options:poll.options||[],results,count:Object.keys(poll.votes||{}).length},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',round:(state.buzz&&state.buzz.round)||0},
@@ -1020,38 +1039,38 @@ const server=http.createServer(async (req,res)=>{
       const ext=(raw.split('.').pop()||'bin').toLowerCase();
       const safe=raw.replace(/[^\w.\-\u4e00-\u9fa5]/g,'_');
       const stored=Date.now().toString(36)+'-'+safe;
-      const dir=roomUploadDir(currentRoom);
+      const dir=roomUploadDir(ctxRoom());
       fs.writeFileSync(path.join(dir,stored),buf);
-      let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
+      let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8')); }catch(e){}
       meta.files=meta.files||[]; meta.files.push({name:raw,stored,size:buf.length,type:ext,at:new Date().toISOString(),released:!b.material,batch:0});
-      fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
-      clearRoomMetaCache(currentRoom);
-    return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom)});
+      fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(meta,null,1));
+      clearRoomMetaCache(ctxRoom());
+    return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(ctxRoom())});
     }catch(e){ return send(res,400,{ok:false,error:String(e.message||e)}); }
   }
   if(p==='/api/room/deletefile' && req.method==='POST'){
     const b=await readBody(req); const stored=String(b.stored||'');
     if(!stored||stored.indexOf('/')>=0||stored.indexOf('..')>=0) return send(res,400,{ok:false,error:'文件名不对'});
-    let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
+    let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8')); }catch(e){}
     const files=(meta.files||[]); const idx=files.findIndex(function(f){return f.stored===stored});
     if(idx<0) return send(res,404,{ok:false,error:'文件不存在'});
-    try{ fs.unlinkSync(path.join(roomUploadDir(currentRoom),stored)); }catch(e){}
-    files.splice(idx,1); meta.files=files; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1)); clearRoomMetaCache(currentRoom);
+    try{ fs.unlinkSync(path.join(roomUploadDir(ctxRoom()),stored)); }catch(e){}
+    files.splice(idx,1); meta.files=files; fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(meta,null,1)); clearRoomMetaCache(ctxRoom());
     return send(res,200,{ok:true});
   }
   if(p==='/api/room/renamefile' && req.method==='POST'){
     const b=await readBody(req); const stored=String(b.stored||''); const name=String(b.name||'').trim();
     if(!stored||stored.indexOf('/')>=0||stored.indexOf('..')>=0||!name) return send(res,400,{ok:false,error:'参数不对'});
-    let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
+    let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8')); }catch(e){}
     const files=(meta.files||[]); const f=files.filter(function(x){return x.stored===stored})[0];
     if(!f) return send(res,404,{ok:false,error:'文件不存在'});
-    f.name=name.slice(0,120); fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1)); clearRoomMetaCache(currentRoom);
+    f.name=name.slice(0,120); fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(meta,null,1)); clearRoomMetaCache(ctxRoom());
     return send(res,200,{ok:true});
   }
   if(p==='/api/room/file'){
     const name=String(u.searchParams.get('name')||'');
     if(!name||name.indexOf('/')>=0||name.indexOf('..')>=0) return send(res,404,'not found','text/plain');
-    const f=path.join(roomUploadDir(currentRoom),name);
+    const f=path.join(roomUploadDir(ctxRoom()),name);
     if(!fs.existsSync(f)) return send(res,404,'not found','text/plain');
     const ext=(name.split('.').pop()||'').toLowerCase();
     const ct=ext==='pdf'?'application/pdf':ext==='pptx'?'application/vnd.openxmlformats-officedocument.presentationml.presentation':ext==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':(ext==='html'||ext==='htm')?'text/html; charset=utf-8':'application/octet-stream';
@@ -1063,10 +1082,10 @@ const server=http.createServer(async (req,res)=>{
   if(p==='/api/room/markdown' && req.method==='POST'){
     const b=await readBody(req); const text=String(b.text||'');
     if(!text.trim()) return send(res,400,{ok:false,error:'缺少内容'});
-    const dir=ensureRoomAssets(currentRoom);
+    const dir=ensureRoomAssets(ctxRoom());
     const base='syllabus-'+Date.now().toString(36);
     fs.writeFileSync(path.join(dir,base+'.html'), mdToHtml(text));
-    let _m={}; try{_m=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8'));}catch(e){} _m.frameworkUrl='/api/room/asset?name='+base; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(_m,null,1));
+    let _m={}; try{_m=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8'));}catch(e){} _m.frameworkUrl='/api/room/asset?name='+base; fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(_m,null,1));
     return send(res,200,{ok:true,url:'/api/room/asset?name='+base});
   }
   if(p==='/api/extract' && req.method==='POST'){
@@ -1085,16 +1104,16 @@ const server=http.createServer(async (req,res)=>{
     let hw=[]; try{ hw=JSON.parse(fs.readFileSync(path.join(PACKAGES_DIR,id,'homework.json'),'utf8')); }catch(e){}
     if(!Array.isArray(hw)||!hw.length) return send(res,400,{ok:false,error:'该课程包没有作业题'});
     state.tasks=hw.map(function(t,i){ return {id:'HW'+(i+1),title:String(t.title||('作业 '+(i+1))),scenario:String(t.scenario||''),requirements:(t.requirements||[]).map(String),deliverable:String(t.deliverable||''),acceptance:String(t.acceptance||'')}; });
-    let _m={}; try{_m=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8'));}catch(e){} _m.packageId=id; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(_m,null,1));
-    const ad=ensureRoomAssets(currentRoom);
+    let _m={}; try{_m=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8'));}catch(e){} _m.packageId=id; fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(_m,null,1));
+    const ad=ensureRoomAssets(ctxRoom());
     fs.writeFileSync(path.join(ad,'quests.html'), renderQuestsPage(state.tasks));
     fs.writeFileSync(path.join(ad,'quests.json'), JSON.stringify(state.tasks,null,2));
     save();
-    return send(res,200,{ok:true,count:state.tasks.length,room:currentRoom});
+    return send(res,200,{ok:true,count:state.tasks.length,room:ctxRoom()});
   }
   if(p==='/api/room/asset'){
     const name=String(u.searchParams.get('name')||'quests').replace(/[^a-z0-9_-]/gi,'');
-    const f=path.join(roomDir(currentRoom),'assets',name+'.html');
+    const f=path.join(roomDir(ctxRoom()),'assets',name+'.html');
     if(!fs.existsSync(f)) return send(res,404,'not found','text/plain');
     return send(res,200,fs.readFileSync(f),'text/html; charset=utf-8');
   }
@@ -1143,7 +1162,7 @@ const server=http.createServer(async (req,res)=>{
     state.quiz=state.quiz||{};
     state.quiz.bank=normalizeQuiz(q);
     state.quiz.config={mode:'random',counts:{choice:5,judge:3,blank:2,short:1},scores:{choice:2,judge:2,blank:3,short:10}};
-    let _m={}; try{_m=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8'));}catch(e){} _m.packageId=id; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(_m,null,1));
+    let _m={}; try{_m=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8'));}catch(e){} _m.packageId=id; fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(_m,null,1));
     save();
     return send(res,200,{ok:true,counts:{choice:state.quiz.bank.choice.length,judge:state.quiz.bank.judge.length,blank:state.quiz.bank.blank.length,short:state.quiz.bank.short.length}});
   }
@@ -1243,9 +1262,9 @@ const server=http.createServer(async (req,res)=>{
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;
     if(htmlGuarded&&!teacher){ res.writeHead(302,{Location:'/login'}); return res.end(); }
     if(apiGuarded&&!teacher) return send(res,401,{ok:false,error:'login required'});
-    if(apiGuarded&&tokenTeacher&&tokenTeacher.role!=='admin'){ const _rq=u.searchParams.get('room'); if(_rq){ if(!canMcpRoom(tokenTeacher,currentRoom)) return send(res,403,{ok:false,error:'该 MCP 令牌无权访问这个场次'}); } else if(p!=='/api/rooms'&&p!=='/api/rooms/create'){ return send(res,403,{ok:false,error:'使用 MCP 令牌调用后台接口时必须带 ?room=场次码'}); } }
+    if(apiGuarded&&tokenTeacher&&tokenTeacher.role!=='admin'){ const _rq=u.searchParams.get('room'); if(_rq){ if(!canMcpRoom(tokenTeacher,ctxRoom())) return send(res,403,{ok:false,error:'该 MCP 令牌无权访问这个场次'}); } else if(p!=='/api/rooms'&&p!=='/api/rooms/create'){ return send(res,403,{ok:false,error:'使用 MCP 令牌调用后台接口时必须带 ?room=场次码'}); } }
   }
-  if(p==='/api/rooms' && req.method==='GET') return send(res,200,{ok:true,rooms:listRooms(getTeacher(req)),current:currentRoom});
+  if(p==='/api/rooms' && req.method==='GET') return send(res,200,{ok:true,rooms:listRooms(getTeacher(req)),current:ctxRoom()});
   if(p==='/api/rooms/create' && req.method==='POST'){
     const b=await readBody(req);
     const _t=getTeacher(req); const code=createRoom(b.title,b.city,b.date,_t&&_t.id,b.province,b.project);
@@ -1289,7 +1308,7 @@ const server=http.createServer(async (req,res)=>{
     const b=await readBody(req); const code=String(b.code||'').toUpperCase();
     if(!validRoom(code)) return send(res,400,{ok:false,error:'房间码不对'});
     const f=roomStateFile(code); if(!fs.existsSync(f)) return send(res,404,{ok:false,error:'房间不存在'});
-    setRoom(code); state=roomCache[currentRoom]=blank(); save();
+    enterRoom(code); const _blankState=blank(); roomCache[code]=_blankState; const _ctx=requestCtx.getStore(); if(_ctx)_ctx.state=_blankState; saveRoom(code,_blankState);
     return send(res,200,{ok:true,code});
   }
   if(p==='/api/screen/perf' && req.method==='POST'){
@@ -1329,7 +1348,7 @@ const server=http.createServer(async (req,res)=>{
           const byTask={}; subs.forEach(x=>{byTask[x.task]=(byTask[x.task]||0)+1});
           const quiz=state.quiz||{};
           const answers=Object.keys(quiz.answers||{}).map(k=>{const a=quiz.answers[k];return {key:k,score:a.score,total:a.total,at:a.at}});
-          return send(res,200,{ok:true,room:currentRoom,generatedAt:new Date().toISOString(),students,groups:screenView().groups,poll:screenView().poll,quiz:{paper:screenView().quiz,answers},submissions:{count:subs.length,byTask,list:subs},timer:state.timer||null});
+          return send(res,200,{ok:true,room:ctxRoom(),generatedAt:new Date().toISOString(),students,groups:screenView().groups,poll:screenView().poll,quiz:{paper:screenView().quiz,answers},submissions:{count:subs.length,byTask,list:subs},timer:state.timer||null});
         }
         if(p==='/api/report.csv'){
           const lines=['姓名,尾号,小组,投票,抢答,作业数'];
@@ -1358,7 +1377,7 @@ const server=http.createServer(async (req,res)=>{
           state.poll.votes[k]=idx; const _st=state.students[k]; if(_st)_st.votes=(_st.votes||0)+1; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true});
         }
         if(p==='/api/quiz/submit'){
-          const _room=currentRoom,_st=state,_quiz=_st.quiz;
+          const _room=ctxRoom(),_st=state,_quiz=_st.quiz;
           const k=keyOf(b.name,b.tail); ensureStudent(b.name,b.tail);
           const pz=_quiz&&_quiz.paper;
           if(!pz||!pz.active) return send(res,400,{ok:false,error:'答题未开始'});
@@ -1424,7 +1443,7 @@ const server=http.createServer(async (req,res)=>{
           return send(res,200,{ok:true,counts:{choice:state.quiz.bank.choice.length,judge:state.quiz.bank.judge.length,blank:state.quiz.bank.blank.length,short:state.quiz.bank.short.length}});
         }
         if(p==='/api/admin/quizgen' && req.method==='POST'){
-          const _room=currentRoom,_st=state;
+          const _room=ctxRoom(),_st=state;
           const source=String(b.source||'').trim().slice(0,12000);
           if(!source) return send(res,400,{ok:false,error:'请先粘贴课程大纲或素材'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
@@ -1563,13 +1582,13 @@ const server=http.createServer(async (req,res)=>{
         if(p==='/api/admin/material-release'){
           const stored=(Array.isArray(b.stored)?b.stored:[b.stored]).map(String).filter(Boolean);
           if(!stored.length) return send(res,400,{ok:false,error:'先选择素材'});
-          let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
+          let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(ctxRoom()),'utf8')); }catch(e){}
           const files=meta.files||[]; let matched=0; const released=!!b.released;
           const batch=released?((Number(state.config&&state.config.materialBatch)||0)+1):0;
           files.forEach(function(f){ if(stored.indexOf(f.stored)<0)return; matched++; f.released=released; f.releasedAt=released?new Date().toISOString():''; f.batch=released?batch:(f.batch||0); });
           if(!matched) return send(res,404,{ok:false,error:'没有匹配的素材'});
-          meta.files=files; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
-          clearRoomMetaCache(currentRoom);
+          meta.files=files; fs.writeFileSync(roomMetaFile(ctxRoom()),JSON.stringify(meta,null,1));
+          clearRoomMetaCache(ctxRoom());
           state.config=state.config||{}; if(released){ state.config.materialOpen=true; state.config.materialBatch=batch; }
           state.updatedAt=new Date().toISOString(); save();
           return send(res,200,{ok:true,count:matched,batch:batch,materialOpen:!!state.config.materialOpen});
@@ -1636,7 +1655,7 @@ const server=http.createServer(async (req,res)=>{
         if(p==='/api/admin/scoreai'){
           if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
-          const _room=currentRoom,_st=state;
+          const _room=ctxRoom(),_st=state;
           const sub=_st.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'});
           const rr=await aiScoreSubmission(sub,b.rubric||[],b.task||'');
           if(!rr.ok) return send(res,502,{ok:false,error:rr.error});
@@ -1645,7 +1664,7 @@ const server=http.createServer(async (req,res)=>{
         if(p==='/api/admin/rescore'){
           if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'});
           const mc=modelCfg(); if(!mc.key) return send(res,400,{ok:false,error:'请先在「模型管理」配置 API Key'});
-          const _room=currentRoom,_st=state;
+          const _room=ctxRoom(),_st=state;
           const items=Array.isArray(b.items)?b.items:[];
           if(!items.length) return send(res,400,{ok:false,error:'没有可重评的提交'});
           let scored=0; const failed=[];
@@ -1660,7 +1679,7 @@ const server=http.createServer(async (req,res)=>{
         }
         if(p==='/api/admin/score'){ if(!reviewOn()) return send(res,400,{ok:false,error:'作业评审已关闭'}); const sub=state.submissions[b.key]; if(!sub) return send(res,404,{ok:false,error:'submission not found'}); if(b.manual) sub.manual=b.manual; if(b.score) sub.score=b.score; save(); return send(res,200,{ok:true}); }
         /* score 可含 override 字段：人工直接定总分 */
-        if(p==='/api/admin/reset'){ if(b.scope==='poll'){ state.poll={active:false,question:'',options:[],votes:{},startedAt:''}; } else if(b.scope==='groups'){ Object.values(state.students).forEach(s=>s.group=''); } else { const _m=state.config&&state.config.model; state=blank(); if(_m)state.config.model=_m; } save(); return send(res,200,{ok:true}); }
+        if(p==='/api/admin/reset'){ if(b.scope==='poll'){ state.poll={active:false,question:'',options:[],votes:{},startedAt:''}; } else if(b.scope==='groups'){ Object.values(state.students).forEach(s=>s.group=''); } else { const _m=state.config&&state.config.model; const _room=ctxRoom(); const _new=blank(); if(_m)_new.config.model=_m; roomCache[_room]=_new; const _ctx=requestCtx.getStore(); if(_ctx)_ctx.state=_new; } save(); return send(res,200,{ok:true}); }
       }
       return send(res,404,{ok:false,error:'no api'});
     }catch(e){ return send(res,500,{ok:false,error:String(e.message||e)}); }
