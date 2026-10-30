@@ -1237,7 +1237,7 @@ const server=http.createServer(async (req,res)=>{
     const tokenTeacher=cookieTeacher?null:teacherByMcpToken(bearerToken(req));
     const teacher=cookieTeacher||tokenTeacher;
     let htmlGuarded=(p==='/ops'||p==='/admin'||p==='/grader'||p==='/shell'||p==='/teachers'||p==='/packages'||p==='/report'||p==='/remote'||p==='/package-edit'||p==='/room'||p==='/home'||p==='/room-setup');
-    let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown');
+    let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown')||(p==='/api/room/deletefile')||(p==='/api/room/renamefile');
     if(p==='/report' && u.searchParams.get('embed')==='1') htmlGuarded=false;
     if(p==='/api/screen/perf'||p==='/api/screen/tab') apiGuarded=false;
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;

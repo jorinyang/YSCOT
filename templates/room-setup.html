@@ -141,12 +141,21 @@ function renderFiles(files){
   var ppt=[], html=[];
   files.forEach(function(f){ var ext=(f.name.split('.').pop()||'').toLowerCase(); if(ext==='pptx'||ext==='ppt')ppt.push(f); else if(ext==='html'||ext==='htm')html.push(f); });
   document.getElementById('pptxList').innerHTML=ppt.length?ppt.map(function(f){
-    return '<div class="file"><div style="min-width:0"><div class="nm">'+esc(f.name)+'</div><div class="meta">'+fmtSize(f.size||0)+' · PPTX</div></div><div><a class="btn" href="'+f.url+'" target="_blank">打开</a></div></div>';
+    return '<div class="file"><div style="min-width:0"><div class="nm">'+esc(f.name)+'</div><div class="meta">'+fmtSize(f.size||0)+' · PPTX</div></div><div><a class="btn" href="'+f.url+'" target="_blank">打开</a> <button class="btn danger" data-delfile="'+encodeURIComponent(f.stored)+'" data-fname="'+encodeURIComponent(f.name)+'">删除</button></div></div>';
   }).join(''):'<div class="hint">还没有上传 pptx</div>';
   document.getElementById('htmlList').innerHTML=html.length?html.map(function(f){
-    return '<div class="file"><div style="min-width:0"><div class="nm">'+esc(f.name)+'</div><div class="meta">'+fmtSize(f.size||0)+' · HTML</div></div><div><button class="btn" data-preview="'+encodeURIComponent(f.url)+'">预览</button> <a class="btn" href="'+f.url+'" target="_blank">打开</a></div></div>';
+    return '<div class="file"><div style="min-width:0"><div class="nm">'+esc(f.name)+'</div><div class="meta">'+fmtSize(f.size||0)+' · HTML</div></div><div><button class="btn" data-preview="'+encodeURIComponent(f.url)+'">预览</button> <a class="btn" href="'+f.url+'" target="_blank">打开</a> <button class="btn danger" data-delfile="'+encodeURIComponent(f.stored)+'" data-fname="'+encodeURIComponent(f.name)+'">删除</button></div></div>';
   }).join(''):'<div class="hint">还没有上传 html</div>';
   document.querySelectorAll('[data-preview]').forEach(function(b){ b.onclick=function(){ var w=document.getElementById('previewWrap'); w.style.display='block'; document.getElementById('previewFrame').src=decodeURIComponent(b.getAttribute('data-preview')); w.scrollIntoView({behavior:'smooth',block:'center'}); }; });
+  document.querySelectorAll('[data-delfile]').forEach(function(b){ b.onclick=function(){
+    var stored=decodeURIComponent(b.getAttribute('data-delfile')), name=decodeURIComponent(b.getAttribute('data-fname')||stored);
+    if(!confirm('删除课程内容「'+name+'」？删除后大屏和课堂入口将无法再打开。'))return;
+    fetch('/api/room/deletefile?room='+CODE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stored:stored})}).then(function(r){return r.json()}).then(function(d){
+      if(!d.ok){alert(d.error||'删除失败');return}
+      var f=document.getElementById('previewFrame'); if(f&&f.src.indexOf(encodeURIComponent(stored))>=0){f.removeAttribute('src');document.getElementById('previewWrap').style.display='none';}
+      loadRoom();
+    }).catch(function(e){alert('删除失败：'+e.message)});
+  }; });
 }
 function uploadFiles(inputId,msgId,allowed){
   var inp=document.getElementById(inputId); if(!inp)return;
