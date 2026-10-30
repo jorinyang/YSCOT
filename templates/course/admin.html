@@ -518,9 +518,17 @@ refresh();setInterval(refresh,2500);
     fetch('/api/rooms',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
       var room=(d.rooms||[]).filter(function(x){return x.code===ROOM})[0]||{}; var fs=room.files||[];
       var ext=window.__extMaterials||[];
-      var items=fs.map(function(f){return '<div><a href="'+f.url+'" target="_blank">'+f.name+'</a></div>'}).concat(ext.map(function(f){return '<div><a href="'+f.url+'" target="_blank">'+f.name+'</a> <span class="muted small">外链</span></div>'}));
+      var items=fs.map(function(f){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0"><a href="'+f.url+'" target="_blank">'+f.name+'</a><button class="btn sm danger" data-mdel="'+encodeURIComponent(f.stored)+'" data-mname="'+encodeURIComponent(f.name)+'">删除</button></div>'}).concat(ext.map(function(f){return '<div><a href="'+f.url+'" target="_blank">'+f.name+'</a> <span class="muted small">外链</span></div>'}));
       var ml=document.getElementById('matList');
-      if(ml)ml.innerHTML=items.length?items.join(''):'<span class="muted">还没有素材文件</span>';
+      if(ml){
+        ml.innerHTML=items.length?items.join(''):'<span class="muted">还没有素材文件</span>';
+        ml.querySelectorAll('[data-mdel]').forEach(function(b){b.onclick=function(){
+          var stored=decodeURIComponent(b.getAttribute('data-mdel'));
+          var shown=decodeURIComponent(b.getAttribute('data-mname')||stored);
+          if(!confirm('删除素材「'+shown+'」？删除后学员端和大屏将无法访问。'))return;
+          post('/api/room/deletefile?room='+ROOM,{stored:stored}).then(function(d){ if(d.ok)load(); else alert(d.error||'删除失败'); });
+        }});
+      }
     }).catch(function(){});
   }
   document.getElementById('vpAdd').onclick=function(){

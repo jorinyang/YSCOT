@@ -90,6 +90,7 @@ function roomStateFile(code){ return code===DEFAULT_ROOM ? STATE_FILE : path.joi
 function roomMetaFile(code){ return code===DEFAULT_ROOM ? path.join(DATA_DIR, 'room.json') : path.join(ROOMS_DIR, code, 'room.json'); }
 const ROOM_META_CACHE={};
 function cachedRoomMeta(code){ const n=Date.now(), c=ROOM_META_CACHE[code]; if(c&&n-c.at<3000)return c.data; let data={}; try{ data=JSON.parse(fs.readFileSync(roomMetaFile(code),'utf8')); }catch(e){} ROOM_META_CACHE[code]={at:n,data:data}; return data; }
+function clearRoomMetaCache(code){ delete ROOM_META_CACHE[code]; }
 function validRoom(c){ return /^[A-Z0-9]{4}$/.test(String(c||'')); }
 function loadRoom(code){
   const f=roomStateFile(code);
@@ -1014,7 +1015,8 @@ const server=http.createServer(async (req,res)=>{
       let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
       meta.files=meta.files||[]; meta.files.push({name:raw,stored,size:buf.length,type:ext,at:new Date().toISOString()});
       fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
-      return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom)});
+      clearRoomMetaCache(currentRoom);
+    return send(res,200,{ok:true,name:raw,stored,size:buf.length,url:'/api/room/file?name='+encodeURIComponent(stored)+'&room='+encodeURIComponent(currentRoom)});
     }catch(e){ return send(res,400,{ok:false,error:String(e.message||e)}); }
   }
   if(p==='/api/room/deletefile' && req.method==='POST'){
@@ -1024,7 +1026,7 @@ const server=http.createServer(async (req,res)=>{
     const files=(meta.files||[]); const idx=files.findIndex(function(f){return f.stored===stored});
     if(idx<0) return send(res,404,{ok:false,error:'文件不存在'});
     try{ fs.unlinkSync(path.join(roomUploadDir(currentRoom),stored)); }catch(e){}
-    files.splice(idx,1); meta.files=files; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
+    files.splice(idx,1); meta.files=files; fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1)); clearRoomMetaCache(currentRoom);
     return send(res,200,{ok:true});
   }
   if(p==='/api/room/renamefile' && req.method==='POST'){
@@ -1033,7 +1035,7 @@ const server=http.createServer(async (req,res)=>{
     let meta={}; try{ meta=JSON.parse(fs.readFileSync(roomMetaFile(currentRoom),'utf8')); }catch(e){}
     const files=(meta.files||[]); const f=files.filter(function(x){return x.stored===stored})[0];
     if(!f) return send(res,404,{ok:false,error:'文件不存在'});
-    f.name=name.slice(0,120); fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1));
+    f.name=name.slice(0,120); fs.writeFileSync(roomMetaFile(currentRoom),JSON.stringify(meta,null,1)); clearRoomMetaCache(currentRoom);
     return send(res,200,{ok:true});
   }
   if(p==='/api/room/file'){
