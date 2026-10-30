@@ -1225,7 +1225,7 @@ const server=http.createServer(async (req,res)=>{
     let htmlGuarded=(p==='/ops'||p==='/admin'||p==='/grader'||p==='/shell'||p==='/teachers'||p==='/packages'||p==='/report'||p==='/remote'||p==='/package-edit'||p==='/room'||p==='/home'||p==='/room-setup');
     let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown');
     if(p==='/report' && u.searchParams.get('embed')==='1') htmlGuarded=false;
-    if(p==='/api/screen/perf') apiGuarded=false;
+    if(p==='/api/screen/perf'||p==='/api/screen/tab') apiGuarded=false;
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;
     if(htmlGuarded&&!teacher){ res.writeHead(302,{Location:'/login'}); return res.end(); }
     if(apiGuarded&&!teacher) return send(res,401,{ok:false,error:'login required'});
@@ -1283,6 +1283,7 @@ const server=http.createServer(async (req,res)=>{
     state.groups[g].perf=(state.groups[g].perf||0)+d; state.updatedAt=new Date().toISOString(); save();
     return send(res,200,{ok:true,group:g,perf:state.groups[g].perf});
   }
+  if(p==='/api/screen/tab' && req.method==='POST'){ const b=await readBody(req); const t=String(b.tab||''); if(['base','poll','groups','homework','quiz'].indexOf(t)<0) return send(res,400,{ok:false,error:'tab 不支持'}); state.config=state.config||{}; state.config.screenDataTab=t; state.config.screenView='data'; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,screenView:'data',screenDataTab:t}); }
   if(p==='/api/screen') return send(res,200,screenView());
   if(p==='/api/stream'){
     res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache','Connection':'keep-alive','Access-Control-Allow-Origin':'*'});

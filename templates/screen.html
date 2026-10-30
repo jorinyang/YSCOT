@@ -41,10 +41,13 @@ body{background:#0E0E10;color:#F4F4F5;font-family:Inter,'PingFang SC','Microsoft
 .dataView{position:absolute;inset:0;z-index:3;display:none;flex-direction:column;padding:90px 5vw 3vh;background:radial-gradient(120% 90% at 50% 0,#16352A,#0E0E10 60%);overflow:auto}
 .dataView.show{display:flex}
 .data-tabs{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;align-items:center;padding:6px;border:1px solid rgba(244,244,245,.14);border-radius:999px;background:rgba(20,24,22,.58);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 14px 44px rgba(0,0,0,.28);max-width:94vw;overflow:auto;z-index:6}
-.data-tab{border:0;background:transparent;color:#A1A1AA;font-family:inherit;font-size:clamp(11px,1vw,14px);font-weight:700;padding:8px clamp(10px,1.4vw,18px);border-radius:999px;white-space:nowrap;cursor:default}
+.data-tab{border:0;background:transparent;color:#A1A1AA;font-family:inherit;font-size:clamp(11px,1vw,14px);font-weight:700;padding:8px clamp(10px,1.4vw,18px);border-radius:999px;white-space:nowrap;cursor:pointer;transition:background .2s,color .2s}
+.data-tab:hover{color:#F4F4F5}
+.data-tab.on:hover{color:#101410}
 .data-tab.on{background:#CBF74E;color:#101410;box-shadow:0 0 24px rgba(203,247,78,.18)}
 .data-body{flex:1;min-height:0;display:flex;align-items:center}
 .data-panel{width:100%;animation:dataIn .45s cubic-bezier(.2,.7,.2,1) both}
+.data-panel.no-anim{animation:none}
 @keyframes dataIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .data-kicker{font-size:12px;letter-spacing:.3em;color:#6B6B76;margin-bottom:1.4vh}
 .data-h1{font-size:clamp(28px,4vw,64px);font-weight:900;line-height:1.1;letter-spacing:-.03em;margin-bottom:1vh}
@@ -140,7 +143,7 @@ setInterval(tickClock,250);
 
 function tabButtons(active){
   var tabs=[['base','基础信息'],['poll','投票结果'],['groups','分组情况 / 分数'],['homework','作业提交 / 分数'],['quiz','答题情况 / 分数']];
-  return tabs.map(function(t){return '<span class="data-tab'+(t[0]===active?' on':'')+'">'+t[1]+'</span>'}).join('');
+  return tabs.map(function(t){return '<button type="button" class="data-tab'+(t[0]===active?' on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>'}).join('');
 }
 function pollPanel(d){
   var p=d.poll||{},opts=p.options||[],res=p.results||{},total=Number(p.count)||0,max=1;
@@ -182,15 +185,23 @@ function quizPanel(d){
   var rows=(q.top||[]).map(function(s,i){return '<div class="data-row"><span class="num">'+(i+1)+'</span><span class="name">'+esc(s.name)+' <span class="tag">'+esc(s.tail||'')+'</span></span><span class="tag">'+(s.score||0)+' / '+(s.total||0)+'</span></div>'}).join('');
   return '<div class="data-kicker">YSCOT · 答题情况</div><div class="data-h1">在线答题</div><div class="data-sub">答题分数与排名</div>'+cards+'<div class="data-list">'+(rows||'<div class="data-note">还没有提交</div>')+'</div>';
 }
+var _dataSig='',_dataTab='';
+function dataSig(d,tab){
+  return JSON.stringify({tab:tab,title:d.title,meta:d.meta,students:d.students,individualTop:d.individualTop,groups:d.groups,poll:d.poll,buzz:d.buzz,quiz:d.quiz,homework:d.homework,hwOpen:d.hwOpen,reviewEnabled:d.reviewEnabled,groupsEnabled:d.groupsEnabled,hwCount:d.hwCount});
+}
 function showData(d){
   var dv=document.getElementById('dataView'),f=document.getElementById('viewFrame'),e=document.getElementById('empty');
   var tab=(d.screenDataTab||'base'); if(['base','poll','groups','homework','quiz'].indexOf(tab)<0)tab='base';
-  document.getElementById('dataTabs').innerHTML=tabButtons(tab);
-  var body=tab==='base'?basePanel(d):tab==='poll'?pollPanel(d):tab==='groups'?groupsPanel(d):tab==='homework'?homeworkPanel(d):quizPanel(d);
-  document.getElementById('dataBody').innerHTML='<div class="data-panel">'+body+'</div>';
+  var sig=dataSig(d,tab), changed=sig!==_dataSig, tabChanged=tab!==_dataTab;
   dv.classList.add('show'); f.style.display='none'; e.classList.remove('show');
+  if(!changed) return;
+  _dataSig=sig; _dataTab=tab;
+  if(tabChanged) document.getElementById('dataTabs').innerHTML=tabButtons(tab);
+  var body=tab==='base'?basePanel(d):tab==='poll'?pollPanel(d):tab==='groups'?groupsPanel(d):tab==='homework'?homeworkPanel(d):quizPanel(d);
+  document.getElementById('dataBody').innerHTML='<div class="data-panel'+(tabChanged?'':' no-anim')+'">'+body+'</div>';
 }
 function hideData(){document.getElementById('dataView').classList.remove('show')}
+document.getElementById('dataTabs').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(!b)return;var t=b.getAttribute('data-tab');fetch('/api/screen/tab?room='+room,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tab:t})}).then(function(){refresh()}).catch(function(){})});
 function refresh(){
   fetch('/api/screen?room='+room,{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
     var view=d.screenView||'data';
