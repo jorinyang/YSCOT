@@ -157,7 +157,7 @@ var ROOM=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
 var MAT='/materials/';
 var KEY='camp_live_v3';
 var me={name:'',tail:''};
-var stateData=null,pollChoice=-1,lastPollId='',pending=[];
+var stateData=null,pollChoice=-1,lastPollId='',pending=[],quizPick={};
 var WS=[
  {t:'T1 活动策划方案',p:'20 分',inp:'需求要点 + 往期方案',act:'框架生成 / 内容填充 / 风险审查',out:'可送审方案',ok:'六要素齐全、可执行',files:[['T1 主题卡','t1-主题卡.md'],['T1 需求简报','t1-需求简报.md']]},
  {t:'T2 表格协作',p:'20 分',inp:'报名表 / 对账表等原始表',act:'清洗 / 校验 / 统计 / 透视',out:'干净数据 + 汇总表',ok:'数值可复核',files:[['T2 报名表（1080 行）','t2-报名表-1080行.csv'],['T2 住宿分配规则卡','t2-住宿分配规则卡.md']]},
@@ -240,6 +240,8 @@ $('quizSubmit').addEventListener('click',async function(){
   var qz=stateData&&stateData.quiz; if(!qz||!qz.active||qz.submitted)return;
   var answers={};
   qz.questions.forEach(function(q){
+    var cached=quizPick[q.id];
+    if(cached!==undefined&&cached!==null&&String(cached).trim()!==''){ answers[q.id]=String(cached).trim(); return; }
     if(q.type==='choice'||q.type==='judge'){
       var el=document.querySelector('input[name="r-'+q.id+'"]:checked');
       answers[q.id]=el?el.value:'';
@@ -330,25 +332,31 @@ function render(){
   $('quizCard').classList.toggle('hidden',!qz.active);
   if(qz.active){
     $('quizMeta').textContent=qz.submitted?('已提交 · 得分 '+qz.myScore+' / '+qz.total):('共 '+qz.questions.length+' 题 · 满分 '+qz.total);
-    var qh='';
-    qz.questions.forEach(function(q,i){
-      qh+='<div class="q-item" data-q="'+q.id+'"><div class="qt"><span class="qn">'+(i+1)+'</span>'+q.q+'（'+q.score+' 分）</div>';
-      if(q.type==='choice'){
-        (q.options||[]).forEach(function(o,j){
-          var L=String.fromCharCode(65+j);
-          qh+='<label class="q-opt"><input type="radio" name="r-'+q.id+'" value="'+L+'" '+(qz.submitted?'disabled':'')+' /><span>'+L+'. '+o+'</span></label>';
-        });
-      }else if(q.type==='judge'){
-        qh+='<label class="q-opt"><input type="radio" name="r-'+q.id+'" value="对" '+(qz.submitted?'disabled':'')+' /><span>对</span></label>'
-          +'<label class="q-opt"><input type="radio" name="r-'+q.id+'" value="错" '+(qz.submitted?'disabled':'')+' /><span>错</span></label>';
-      }else if(q.type==='blank'){
-        qh+='<input type="text" data-blank="'+q.id+'" '+(qz.submitted?'disabled':'')+' placeholder="填写答案" />';
-      }else{
-        qh+='<textarea data-short="'+q.id+'" '+(qz.submitted?'disabled':'')+' placeholder="用自己的话回答，尽量覆盖参考答案的要点"></textarea>';
-      }
-      qh+='</div>';
-    });
-    $('quizList').innerHTML=qh;
+    var ae0=document.activeElement;
+    var editingQuiz=!!(ae0&&ae0.getAttribute&&(ae0.getAttribute('data-short')||ae0.getAttribute('data-blank')));
+    if(!editingQuiz){
+      var qh='';
+      var escH=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
+      qz.questions.forEach(function(q,i){
+        qh+='<div class="q-item" data-q="'+q.id+'"><div class="qt"><span class="qn">'+(i+1)+'</span>'+q.q+'（'+q.score+' 分）</div>';
+        var pk=quizPick[q.id]||'';
+        if(q.type==='choice'){
+          (q.options||[]).forEach(function(o,j){
+            var L=String.fromCharCode(65+j);
+            qh+='<label class="q-opt"><input type="radio" name="r-'+q.id+'" value="'+L+'" '+(pk===L?'checked ':'')+(qz.submitted?'disabled':'')+' /><span>'+L+'. '+o+'</span></label>';
+          });
+        }else if(q.type==='judge'){
+          qh+='<label class="q-opt"><input type="radio" name="r-'+q.id+'" value="对" '+(pk==='对'?'checked ':'')+(qz.submitted?'disabled':'')+' /><span>对</span></label>'
+            +'<label class="q-opt"><input type="radio" name="r-'+q.id+'" value="错" '+(pk==='错'?'checked ':'')+(qz.submitted?'disabled':'')+' /><span>错</span></label>';
+        }else if(q.type==='blank'){
+          qh+='<input type="text" data-blank="'+q.id+'" value="'+escH(pk)+'" '+(qz.submitted?'disabled':'')+' placeholder="填写答案" />';
+        }else{
+          qh+='<textarea data-short="'+q.id+'" '+(qz.submitted?'disabled':'')+' placeholder="用自己的话回答，尽量覆盖参考答案的要点">'+escH(pk)+'</textarea>';
+        }
+        qh+='</div>';
+      });
+      $('quizList').innerHTML=qh;
+    }
     $('quizSubmit').style.display=qz.submitted?'none':'block';
     $('quizMsg').textContent=qz.submitted?'答卷已提交，等待讲师汇总。':'提交后不可修改；客观题自动判分，简答题按与参考答案的匹配度评分。';
   }
@@ -379,6 +387,8 @@ function render(){
 async function refresh(){var s=await getState();if(s)render()}
 function openMain(){
   $('gate').classList.add('hidden');$('main').classList.remove('hidden');
+  document.addEventListener('change',function(e){var t=e.target;if(!t||!t.name)return;if(t.name.indexOf('r-')===0)quizPick[t.name.slice(2)]=t.value;});
+  document.addEventListener('input',function(e){var t=e.target;if(!t||!t.getAttribute)return;var b=t.getAttribute('data-blank');if(b)quizPick[b]=t.value;var s=t.getAttribute('data-short');if(s)quizPick[s]=t.value;});
   render();refresh();setInterval(refresh,3000);
 }
 $('drawBtn').addEventListener('click',async function(){
