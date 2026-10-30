@@ -53,6 +53,52 @@ Content-Type: application/json
 
 如果客户端要求“命令 + 参数”的形式，用 `curl` 或任意 HTTP 客户端包一层即可；服务端不依赖特定客户端。
 
+## 三·五、直接调用 HTTP API（可选）
+
+同一个个人 token 也可以直接调 YSCOT 的 /api/* 后台接口，不要求教师登录 Cookie。适合 Agent 用 curl / HTTP 客户端直接写入内容。
+
+规则：
+
+- 请求头带 Authorization: Bearer <MCP_TOKEN>；
+- 必须带 ?room=场次码，token 只能操作自己有权限的场次；
+- 没有 token 返回 401；token 没有该场次权限返回 403。
+
+上传在线答题题库（替换题库）：
+
+~~~bash
+curl -s "https://yscot.clawshell.online/api/admin/quizbank?room=YQ2X" \
+  -X POST \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "replace",
+    "bank": {
+      "choice": [
+        {"q": "AI 是什么？", "options": ["工具", "方法", "以上都是"], "answer": "C"}
+      ],
+      "judge": [
+        {"q": "AI 可以直接替代公司对外承诺。", "answer": "错"}
+      ],
+      "blank": [
+        {"q": "RAG 的中文全称是____增强生成。", "answer": "检索"}
+      ],
+      "short": [
+        {"q": "说说你会把哪类工作先交给 AI。", "ref": "重复、可校验的活优先。"}
+      ]
+    }
+  }'
+~~~
+
+返回：
+
+~~~json
+{"ok":true,"counts":{"choice":1,"judge":1,"blank":1,"short":1}}
+~~~
+
+也可以先把题库写成 JSON 文件，再用 --data-binary @quiz.json，避免 shell 转义。
+
+注意：这是后台写接口，不要发到公开页面或前端代码里；token 和场次码都按内部资料处理。
+
 ## 四、三步验证
 
 ### 1. 列工具

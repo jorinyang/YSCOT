@@ -399,7 +399,15 @@ curl -s https://yscot.clawshell.online/mcp \
   <tr><td><code>remote.state</code></td><td>读取遥控器状态</td><td><code>room</code>；返回投票、答题、计时、分组、卡片</td></tr>
   <tr><td><code>remote.control</code></td><td>执行遥控器动作</td><td><code>room, action</code>；如 <code>screen.set</code>、<code>material.toggle</code>、<code>roll.start</code>、<code>poll.start</code>、<code>timer.start</code></td></tr>
   </table>
-  <h2>5. 常见错误</h2>
+  <h2>5. 也可直接调 /api 后台（可选）</h2>
+  <p>同一个个人 token 也能直接调用 /api 后台接口，不需要教师登录 Cookie。必须带 <code>?room=场次码</code>；token 只能操作自己的场次。</p>
+  <pre>curl -s "https://yscot.clawshell.online/api/admin/quizbank?room=YQ2X" \
+  -X POST \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"replace","bank":{"choice":[],"judge":[],"blank":[],"short":[]}}'</pre>
+  <p class="muted">401 = 没有 token；403 = token 没有该场次权限。</p>
+  <h2>6. 常见错误</h2>
   <table><tr><th>现象</th><th>处理</th></tr>
   <tr><td>401 unauthorized</td><td>到工作台「模型与MCP → MCP 接入令牌」复制；检查是否被重置或多了空格；不要用浏览器 GET 代替 POST。</td></tr>
   <tr><td>工具返回“题库为空”</td><td>先导入 <code>votebank.put</code> 或后台「在线答题」题库；投票题和答题题库不是同一份数据。</td></tr>
@@ -1235,7 +1243,7 @@ const server=http.createServer(async (req,res)=>{
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;
     if(htmlGuarded&&!teacher){ res.writeHead(302,{Location:'/login'}); return res.end(); }
     if(apiGuarded&&!teacher) return send(res,401,{ok:false,error:'login required'});
-    if(apiGuarded&&tokenTeacher&&tokenTeacher.role!=='admin'){ const _rq=u.searchParams.get('room'); if(_rq){ if(!canMcpRoom(tokenTeacher,currentRoom)) return send(res,403,{ok:false,error:'该 MCP 令牌无权访问这个场次'}); } else if(p.indexOf('/api/admin')===0||p==='/api/report'||p==='/api/report.csv'||p==='/api/room/upload'||p==='/api/room/markdown'){ return send(res,403,{ok:false,error:'使用 MCP 令牌调用后台接口时必须带 ?room=场次码'}); } }
+    if(apiGuarded&&tokenTeacher&&tokenTeacher.role!=='admin'){ const _rq=u.searchParams.get('room'); if(_rq){ if(!canMcpRoom(tokenTeacher,currentRoom)) return send(res,403,{ok:false,error:'该 MCP 令牌无权访问这个场次'}); } else if(p!=='/api/rooms'&&p!=='/api/rooms/create'){ return send(res,403,{ok:false,error:'使用 MCP 令牌调用后台接口时必须带 ?room=场次码'}); } }
   }
   if(p==='/api/rooms' && req.method==='GET') return send(res,200,{ok:true,rooms:listRooms(getTeacher(req)),current:currentRoom});
   if(p==='/api/rooms/create' && req.method==='POST'){
