@@ -157,7 +157,10 @@ var ROOM=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
 var MAT='/materials/';
 var KEY='camp_live_v3';
 var me={name:'',tail:''};
-var stateData=null,pollChoice=-1,lastPollId='',pending=[],quizPick={};
+var stateData=null,pollChoice=-1,lastPollId='',pending=[];
+var QUIZPICK_KEY='camp_live_quizpick_'+ROOM;
+var quizPick=(function(){try{return JSON.parse(sessionStorage.getItem(QUIZPICK_KEY)||'{}')||{}}catch(e){return{}}})();
+function saveQuizPick(){try{sessionStorage.setItem(QUIZPICK_KEY,JSON.stringify(quizPick))}catch(e){}}
 var WS=[
  {t:'T1 活动策划方案',p:'20 分',inp:'需求要点 + 往期方案',act:'框架生成 / 内容填充 / 风险审查',out:'可送审方案',ok:'六要素齐全、可执行',files:[['T1 主题卡','t1-主题卡.md'],['T1 需求简报','t1-需求简报.md']]},
  {t:'T2 表格协作',p:'20 分',inp:'报名表 / 对账表等原始表',act:'清洗 / 校验 / 统计 / 透视',out:'干净数据 + 汇总表',ok:'数值可复核',files:[['T2 报名表（1080 行）','t2-报名表-1080行.csv'],['T2 住宿分配规则卡','t2-住宿分配规则卡.md']]},
@@ -259,6 +262,7 @@ $('quizSubmit').addEventListener('click',async function(){
     var r=await fetch(API+'/api/quiz/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:me.name,tail:me.tail,answers:answers})});
     var d=await r.json();
     if(!d.ok){alert(d.error||'提交失败');return}
+    quizPick={}; try{sessionStorage.removeItem(QUIZPICK_KEY)}catch(e){}
     alert('交卷成功：'+d.score+' / '+d.total+' 分');
     await refresh();
   }catch(e){alert('没连上课堂服务')}
@@ -333,7 +337,7 @@ function render(){
   if(qz.active){
     $('quizMeta').textContent=qz.submitted?('已提交 · 得分 '+qz.myScore+' / '+qz.total):('共 '+qz.questions.length+' 题 · 满分 '+qz.total);
     var ae0=document.activeElement;
-    var editingQuiz=!!(ae0&&ae0.getAttribute&&(ae0.getAttribute('data-short')||ae0.getAttribute('data-blank')));
+    var editingQuiz=!!(ae0&&ae0.getAttribute&&(ae0.getAttribute('data-short')||ae0.getAttribute('data-blank')||(ae0.name&&ae0.name.indexOf('r-')===0)));
     if(!editingQuiz){
       var qh='';
       var escH=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
@@ -387,8 +391,14 @@ function render(){
 async function refresh(){var s=await getState();if(s)render()}
 function openMain(){
   $('gate').classList.add('hidden');$('main').classList.remove('hidden');
-  document.addEventListener('change',function(e){var t=e.target;if(!t||!t.name)return;if(t.name.indexOf('r-')===0)quizPick[t.name.slice(2)]=t.value;});
-  document.addEventListener('input',function(e){var t=e.target;if(!t||!t.getAttribute)return;var b=t.getAttribute('data-blank');if(b)quizPick[b]=t.value;var s=t.getAttribute('data-short');if(s)quizPick[s]=t.value;});
+  function rememberPick(t){ if(t&&t.name&&t.name.indexOf('r-')===0){ quizPick[t.name.slice(2)]=t.value; saveQuizPick(); } }
+  document.addEventListener('change',function(e){rememberPick(e.target);});
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    if(t&&t.closest){var lb=t.closest('label'); if(lb){var inp=lb.querySelector('input[name^="r-"]'); if(inp){rememberPick(inp);return;}}}
+    rememberPick(t);
+  });
+  document.addEventListener('input',function(e){var t=e.target;if(!t||!t.getAttribute)return;var b=t.getAttribute('data-blank');if(b){quizPick[b]=t.value;saveQuizPick()}var s=t.getAttribute('data-short');if(s){quizPick[s]=t.value;saveQuizPick()}});
   render();refresh();setInterval(refresh,3000);
 }
 $('drawBtn').addEventListener('click',async function(){
