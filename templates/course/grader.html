@@ -61,6 +61,7 @@ body{animation:pageIn .32s ease both}
     <div class="rowflex">
       <button class="btn" id="refresh">刷新</button>
       <button class="btn ghost" id="exportBtn">导出 CSV</button>
+      <button class="btn ghost" id="downloadAll">下载全部作业</button>
       <button class="btn" id="aiRescore">AI 重评全部</button>
       <button class="btn ghost" id="critBtn">评分标准</button>
       <button class="btn danger" id="resetAll">清空全部提交</button>
@@ -110,6 +111,7 @@ var TASKS=[
   manual:[],crit:[['差异召回（10处）',10,'每处1分；漏报扣分'],['定位准确（方名+项目名）',3,'写清在哪一方的哪一行'],['金额核对',3,'差异金额与教师版一致'],['处理建议合理',4,'可执行、责任到方']]}
 ];
 var st=null, curKey='', hwOpen=false, reviewOpen=true;
+document.getElementById('downloadAll').onclick=function(){var a=document.createElement('a');a.href=API+'/api/admin/homework/zip';a.download='';document.body.appendChild(a);a.click();a.remove();};
 var ALL_TASKS=TASKS.slice(); var HWCOUNT=6;
 fetch(API+'/api/admin/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
   var rb=(d&&d.rubrics)||{};

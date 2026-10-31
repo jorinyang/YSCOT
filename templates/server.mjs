@@ -30,6 +30,7 @@ const LOCAL_PASSWORD = process.env.LOCAL_TEACHER_PASSWORD || '';
 const DING_ID = process.env.DINGTALK_CLIENT_ID || '';
 const DING_SECRET = process.env.DINGTALK_CLIENT_SECRET || '';
 function sign(v){ return crypto.createHmac('sha256',SESSION_SECRET).update(v).digest('hex').slice(0,32); }
+function hwZipSig(room,exp,task,student){ return sign(['hwzip',String(room||''),String(exp||''),String(task||''),String(student||'')].join('|')); }
 function setTeacherCookie(res, teacher){ const v=Buffer.from(JSON.stringify({id:teacher.id,name:teacher.name,role:teacher.role,exp:Date.now()+7*864e5})).toString('base64url'); res.setHeader('Set-Cookie','gtsc_teacher='+v+'.'+sign(v)+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800'); }
 function getCookieTeacher(req){ const raw=String(req.headers.cookie||''); const m=raw.match(/(?:^|;\s*)gtsc_teacher=([^;]+)/); if(!m)return null; const [v,sig]=m[1].split('.'); if(!v||!sig||sign(v)!==sig)return null; try{ const t=JSON.parse(Buffer.from(v,'base64url').toString()); if(!t.exp||t.exp<Date.now())return null; return t; }catch(e){ return null; } }
 function bearerToken(req){ const h=String(req.headers.authorization||'').trim(); if(h.toLowerCase().indexOf('bearer ')===0)return h.slice(7).trim(); return String(req.headers['x-mcp-token']||'').trim(); }
@@ -104,6 +105,47 @@ function loadRoom(code){
   try{ return Object.assign(blank(), JSON.parse(fs.readFileSync(f,'utf8'))); }catch(e){ return blank(); }
 }
 function saveRoom(code, st){ const f=roomStateFile(code); fs.mkdirSync(path.dirname(f),{recursive:true}); fs.writeFileSync(f, JSON.stringify(st)); }
+const ZIP_CRC=(function(){const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function zipCrc32(buf){let c=0xFFFFFFFF;for(let i=0;i<buf.length;i++)c=ZIP_CRC[(c^buf[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function zipDosTime(d){const y=Math.max(1980,d.getFullYear());return {time:((d.getHours()&31)<<11)|((d.getMinutes()&63)<<5)|((d.getSeconds()/2)&31),date:(((y-1980)&127)<<9)|(((d.getMonth()+1)&15)<<5)|(d.getDate()&31)};}
+function makeZip(entries){
+  const parts=[],central=[];let offset=0;const dt=zipDosTime(new Date());let total=0;
+  entries.forEach(function(e){
+    const name=Buffer.from(String(e.name||'file'),'utf8'); const data=Buffer.isBuffer(e.data)?e.data:Buffer.from(String(e.data||''));
+    total+=data.length; if(total>250*1024*1024) throw new Error('作业包超过 250MB，请按任务分批下载');
+    const crc=zipCrc32(data); const lh=Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x0800,6);lh.writeUInt16LE(0,8);lh.writeUInt16LE(dt.time,10);lh.writeUInt16LE(dt.date,12);lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);lh.writeUInt16LE(0,28);
+    parts.push(lh,name,data);
+    const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x0800,8);ch.writeUInt16LE(0,10);ch.writeUInt16LE(dt.time,12);ch.writeUInt16LE(dt.date,14);ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt16LE(0,30);ch.writeUInt16LE(0,32);ch.writeUInt16LE(0,34);ch.writeUInt16LE(0,36);ch.writeUInt32LE(0,38);ch.writeUInt32LE(offset,42);
+    central.push(ch,name); offset+=lh.length+name.length+data.length;
+  });
+  const cd=Buffer.concat(central);const eocd=Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50,0);eocd.writeUInt16LE(0,4);eocd.writeUInt16LE(0,6);eocd.writeUInt16LE(entries.length,8);eocd.writeUInt16LE(entries.length,10);eocd.writeUInt32LE(cd.length,12);eocd.writeUInt32LE(offset,16);eocd.writeUInt16LE(0,20);
+  return Buffer.concat(parts.concat([cd,eocd]));
+}
+function zipSafe(s){return String(s==null?'':s).replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').replace(/^\.+/,'').slice(0,100)||'file';}
+function csvCell(s){const v=String(s==null?'':s);return /[",\n\r]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v;}
+function buildHomeworkZip(room, task, student){
+  const entries=[],rows=[['姓名','尾号','任务','文件','字节','提交时间']]; let skipped=0;
+  const filterStudent=String(student||'').trim();
+  Object.keys(state.submissions||{}).forEach(function(k){
+    const p=k.split('||'); const sk=p[0], tk=p[1]; if(task && tk!==task) return;
+    if(filterStudent && sk!==filterStudent) return;
+    const sub=state.submissions[k]||{}; const st=state.students[sk]||{}; const nm=st.name||sk.split('|')[0]||'学员'; const tail=st.tail||'';
+    const safeK=sk.replace(/[^a-zA-Z0-9_.\-\u4e00-\u9fa5]/g,'_');
+    (sub.files||[]).forEach(function(f,i){
+      const fp=path.join(DATA_DIR,'uploads',safeK,String(f.path||'')); let data=null;
+      try{ data=fs.readFileSync(fp); }catch(e){ skipped++; return; }
+      const folder=zipSafe(nm+'-'+tail)+'/'+zipSafe(tk);
+      let fn=zipSafe(f.name||('file-'+i)); let name=folder+'/'+fn; let n=1;
+      while(entries.some(function(x){return x.name===name})){ name=folder+'/'+fn.replace(/(\.[^.]+)?$/,'')+'-'+n+(fn.match(/\.[^.]+$/)?fn.match(/\.[^.]+$/)[0]:''); n++; }
+      entries.push({name:name,data:data}); rows.push([nm,tail,tk,f.name||fn,data.length,sub.at||f.at||'']);
+    });
+  });
+  const manifest='\ufeff'+rows.map(function(r){return r.map(csvCell).join(',')}).join('\r\n')+'\r\n';
+  entries.unshift({name:'_提交清单.csv',data:Buffer.from(manifest,'utf8')});
+  return {buf:makeZip(entries),count:entries.length-1,skipped:skipped};
+}
 function listRooms(teacher){
   const out=[];
   const one=function(code){
@@ -346,6 +388,7 @@ function mcpToolDefs(){
     {name:'quiz.publish',description:'按题库发布答题；mode=random 每个学员独立随机卷，seq 统一顺序卷',inputSchema:{type:'object',properties:{room:{type:'string'},mode:{type:'string',enum:['random','seq']},counts:{type:'object'},scores:{type:'object'}}}},
     {name:'score.adjust',description:'调整小组表现分',inputSchema:{type:'object',properties:{room:{type:'string'},group:{type:'string'},delta:{type:'number'}},required:['room','group','delta']}},
     {name:'report.export',description:'导出课堂报告',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
+    {name:'homework.download',description:'批量下载学员作业文件。返回带签名的 zip 下载地址，可直接 HTTP GET；支持按任务(task)或学员(student=姓名|尾号)筛选。',inputSchema:{type:'object',properties:{room:{type:'string'},task:{type:'string'},student:{type:'string'}},required:['room']}},
     {name:'screen.url',description:'取大屏地址',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
     {name:'material.put',description:'导入课程素材。data_base64 写入房间素材库；url 登记外链。返回素材与下载地址。',inputSchema:{type:'object',properties:{room:{type:'string'},name:{type:'string'},filename:{type:'string'},data_base64:{type:'string'},url:{type:'string'},type:{type:'string'},description:{type:'string'}},required:['room','name']}},
     {name:'card.put',description:'导入行动卡或场景卡；带 id 为更新，不带为新增。',inputSchema:{type:'object',properties:{room:{type:'string'},id:{type:'string'},theme:{type:'string'},type:{type:'string'},content:{type:'string'},attrs:{type:'string'}},required:['room','theme']}},
@@ -417,6 +460,7 @@ curl -s https://yscot.clawshell.online/mcp \
 
   <tr><td><code>remote.state</code></td><td>读取遥控器状态</td><td><code>room</code>；返回投票、答题、计时、分组、卡片</td></tr>
   <tr><td><code>remote.control</code></td><td>执行遥控器动作</td><td><code>room, action</code>；如 <code>screen.set</code>、<code>material.toggle</code>、<code>roll.start</code>、<code>poll.start</code>、<code>timer.start</code></td></tr>
+  <tr><td><code>homework.download</code></td><td>批量下载学员作业</td><td><code>room, task?, student?</code>；返回带签名的 zip 地址</td></tr>
   </table>
   <h2>5. 也可直接调 /api 后台（可选）</h2>
   <p>同一个个人 token 也能直接调用 /api 后台接口，不需要教师登录 Cookie。必须带 <code>?room=场次码</code>；token 只能操作自己的场次。</p>
@@ -437,7 +481,7 @@ curl -s https://yscot.clawshell.online/mcp \
   </main></body></html>`;
 }
 
-async function mcpHandle(msg, mcpTeacher){
+async function mcpHandle(msg, mcpTeacher, mcpBase){
   const id=(msg&&msg.id!==undefined)?msg.id:null;
   const method=msg&&msg.method;
   const reply=function(result){ return {jsonrpc:'2.0',id,result}; };
@@ -581,6 +625,20 @@ async function mcpHandle(msg, mcpTeacher){
       }
       if(name==='report.export'){ return reply({content:[{type:'text',text:JSON.stringify({room:ctxRoom(),students:Object.keys(state.students).length,groups:screenView().groups,quiz:screenView().quiz,poll:screenView().poll})}]}); }
       if(name==='screen.url'){ return reply({content:[{type:'text',text:JSON.stringify({url:'/screen?room='+room})}]}); }
+      if(name==='homework.download'){
+        const task=String(a.task||'').trim(), student=String(a.student||'').trim();
+        let count=0;
+        Object.keys(state.submissions||{}).forEach(function(k){
+          const p=k.split('||'); if(task&&p[1]!==task)return; if(student&&p[0]!==student)return;
+          count+=((state.submissions[k]||{}).files||[]).length;
+        });
+        if(!count) return reply({isError:true,content:[{type:'text',text:'当前场次没有可下载的作业文件'+(task?'（任务 '+task+'）':'')}]});
+        const exp=Math.floor(Date.now()/1000)+900;
+        const sig=hwZipSig(room,exp,task,student);
+        const qs='room='+encodeURIComponent(room)+'&exp='+exp+'&sig='+encodeURIComponent(sig)+(task?'&task='+encodeURIComponent(task):'')+(student?'&student='+encodeURIComponent(student):'');
+        const url=String(mcpBase||'').replace(/\/$/,'')+'/api/admin/homework/zip?'+qs;
+        return reply({content:[{type:'text',text:JSON.stringify({ok:true,count:count,url:url,filename:'YSCOT-Homework-'+room+(task?('-'+task):'')+'.zip',expiresAt:new Date(exp*1000).toISOString()})}]});
+      }
       return reply({isError:true,content:[{type:'text',text:'unknown tool '+name}]});
     }catch(e){ return reply({isError:true,content:[{type:'text',text:String(e.message||e)}]}); }
   }
@@ -896,7 +954,11 @@ const server=http.createServer(async (req,res)=>{
     if(!mcpTeacher&&process.env.MCP_TOKEN&&bearer===process.env.MCP_TOKEN) mcpTeacher={id:'local',name:'服务令牌',role:'admin'};
     if(!mcpTeacher) return send(res,401,{jsonrpc:'2.0',error:{code:-32001,message:'unauthorized: 请使用工作台「模型与MCP → MCP 接入令牌」里的个人 token，并放在 Authorization: Bearer 后'},id:null});
     const body=await readBody(req,16*1024*1024);
-    const reply=await mcpHandle(body,mcpTeacher);
+    const _hostHeader=String(req.headers['x-forwarded-host']||req.headers.host||'yscot.clawshell.online');
+    const _proto=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim()||(/^(localhost|127\.0\.0\.1|\[::1\])/.test(_hostHeader)?'http':'https');
+    const _host=_hostHeader;
+    const _base=_proto+'://'+_host;
+    const reply=await mcpHandle(body,mcpTeacher,_base);
     return send(res,200,reply);
   }
   if(p==='/api/auth/config') return send(res,200,{ok:true,dingtalk:!!(DING_ID&&DING_SECRET),local:!!LOCAL_PASSWORD,required:AUTH_REQUIRED});
@@ -1259,6 +1321,11 @@ const server=http.createServer(async (req,res)=>{
     let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown')||(p==='/api/room/deletefile')||(p==='/api/room/renamefile');
     if(p==='/report' && u.searchParams.get('embed')==='1') htmlGuarded=false;
     if(p==='/api/screen/perf'||p==='/api/screen/tab') apiGuarded=false;
+    if(p==='/api/admin/homework/zip'&&req.method==='GET'){
+      const _exp=Number(u.searchParams.get('exp')||0), _sig=String(u.searchParams.get('sig')||'');
+      const _task=String(u.searchParams.get('task')||''), _student=String(u.searchParams.get('student')||'');
+      if(_exp>Math.floor(Date.now()/1000)&&_sig&&_sig===hwZipSig(ctxRoom(),_exp,_task,_student)) apiGuarded=false;
+    }
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;
     if(htmlGuarded&&!teacher){ res.writeHead(302,{Location:'/login'}); return res.end(); }
     if(apiGuarded&&!teacher) return send(res,401,{ok:false,error:'login required'});
@@ -1341,7 +1408,18 @@ const server=http.createServer(async (req,res)=>{
     try{
       if(p==='/api/ping') return send(res,200,{ok:true,ts:Date.now()});
       if(p==='/api/state'){ const name=u.searchParams.get('name')||''; const tail=u.searchParams.get('tail')||''; if(!name||!tail) return send(res,400,{ok:false,error:'need name+tail'}); ensureStudent(name,tail); return send(res,200,studentView(keyOf(name,tail))); }
-      if(p==='/api/admin/state') return send(res,200,adminView());
+      if(p==='/api/admin/homework/zip' && req.method==='GET'){
+    const task=String(u.searchParams.get('task')||'').trim();
+    const student=String(u.searchParams.get('student')||'').trim();
+    try{
+      const pack=buildHomeworkZip(ctxRoom(),task,student);
+      if(!pack.count) return send(res,404,'没有可下载的作业文件','text/plain; charset=utf-8');
+      const filename='YSCOT-Homework-'+String(ctxRoom())+(task?('-'+task):'')+'.zip';
+      res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(filename));
+      return send(res,200,pack.buf,'application/zip');
+    }catch(e){ return send(res,500,String(e.message||e),'text/plain; charset=utf-8'); }
+  }
+  if(p==='/api/admin/state') return send(res,200,adminView());
         if(p==='/api/report'){
           const students=Object.keys(state.students).map(k=>Object.assign({key:k},state.students[k]));
           const subs=Object.keys(state.submissions).map(k=>{const p2=k.split('||');const st=state.students[p2[0]]||{};const sub=state.submissions[k];return {name:st.name||p2[0],tail:st.tail||'',task:p2[1],total:(sub.score&&sub.score.total)||0,grade:(sub.score&&sub.score.grade)||'',source:(sub.score&&sub.score.source)||'',at:sub.at}});
