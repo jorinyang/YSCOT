@@ -66,6 +66,7 @@ body{animation:pageIn .32s ease both}
     <button class="tabbtn on" data-tab="class">课堂管理</button>
     <button class="tabbtn" data-tab="hw">作业评分</button>
     <button class="tabbtn" data-tab="quiz">在线答题</button>
+    <button class="tabbtn" data-tab="history">历史记录</button>
   </div>
   <div id="pane-class"><div class="grid2">
     <div class="card">
@@ -179,6 +180,12 @@ body{animation:pageIn .32s ease both}
     </div>
   </div>
 
+  </div><div id="pane-history" class="hidden">
+    <div class="card" style="margin-top:14px">
+      <div class="k">历史记录</div>
+      <div class="muted small" style="margin:-2px 0 12px">投票、作业提交、在线答题按轮次保留；新一轮不会覆盖旧记录。</div>
+      <div id="historyBox"></div>
+    </div>
   </div><div id="pane-model" class="hidden">
     <div class="card">
       <div class="k">模型管理</div>
@@ -318,6 +325,7 @@ function render(){
   sb+='</table>';
   document.getElementById('studentsBox').innerHTML=sb;
   bind();
+  renderHistory();
 }
 function bind(){
   [].slice.call(document.querySelectorAll('[data-perf]')).forEach(function(b){b.addEventListener('click',async function(){
@@ -462,6 +470,31 @@ function bind(){
     await post('/api/admin/student',{action:'delete',key:key});refresh();
   })});
 }
+function renderHistory(){
+  var box=document.getElementById('historyBox'); if(!box)return;
+  var h=state.history||{polls:[],submissions:[],quizzes:[]}; var out='';
+  out+='<div class="k">投票记录</div>';
+  if(!h.polls||!h.polls.length){ out+='<div class="muted small" style="margin-bottom:14px">暂无已归档投票</div>'; }
+  else { out+=h.polls.slice().reverse().map(function(p){
+    var opts=(p.options||[]).map(function(o,i){return '<div class="small"><b>'+escHtml(o)+'</b>：'+(p.results&&p.results[i]||0)+' 票</div>'}).join('');
+    return '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><div class="small" style="color:var(--amber-l)">'+escHtml(p.question||'')+'</div><div class="muted small">'+escHtml(p.at||'')+' · 共 '+p.total+' 票</div><div style="margin-top:6px">'+opts+'</div></div>';
+  }).join(''); }
+  out+='<div class="k" style="margin-top:16px">作业提交记录</div>';
+  if(!h.submissions||!h.submissions.length){ out+='<div class="muted small" style="margin-bottom:14px">暂无已归档作业</div>'; }
+  else { out+='<div style="overflow:auto"><table><tr><th>时间</th><th>学员</th><th>作业</th><th>文件</th><th>分数</th></tr>'; h.submissions.slice().reverse().forEach(function(s){
+    var files=(s.files||[]).map(function(f,i){return '<a href="/api/file?record='+encodeURIComponent(s.id)+'&i='+i+'&room='+encodeURIComponent(ROOM)+'" target="_blank">'+escHtml(f.name)+'</a>'}).join('、')||'—';
+    var score=s.score&&s.score.total!=null?s.score.total:'—';
+    out+='<tr><td class="small muted">'+escHtml(s.archivedAt||s.at||'')+'</td><td>'+escHtml(s.name||'')+' <span class="muted small">'+escHtml(s.tail||'')+'</span></td><td>'+escHtml(s.task||'')+'</td><td class="small">'+files+'</td><td>'+score+'</td></tr>';
+  }); out+='</table></div>'; }
+  out+='<div class="k" style="margin-top:16px">在线答题记录</div>';
+  if(!h.quizzes||!h.quizzes.length){ out+='<div class="muted small" style="margin-bottom:14px">暂无已归档答题</div>'; }
+  else { h.quizzes.slice().reverse().forEach(function(q){
+    var ans=q.answers||{}; var keys=Object.keys(ans); var avg=keys.length?Math.round(keys.reduce(function(a,k){return a+((ans[k]||{}).score||0)},0)/keys.length*10)/10:0;
+    var rows=keys.slice(0,30).map(function(k){var st=(state.students||[]).filter(function(x){return x.key===k})[0]||{};return '<div class="small">'+escHtml(st.name||k)+'：'+((ans[k]||{}).score||0)+' / '+((ans[k]||{}).total||0)+'</div>'}).join('');
+    out+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+escHtml(q.publishedAt||q.at||'')+' · '+escHtml(q.mode||'')+'</b><span class="pill">已答 '+q.answered+' · 均分 '+avg+'</span></div><div class="muted small" style="margin:6px 0">'+(q.questions||[]).length+' 题 · 归档 '+escHtml(q.at||'')+'</div><details><summary class="muted small" style="cursor:pointer">查看学员得分</summary>'+rows+(keys.length>30?'<div class="muted small">仅显示前 30 人</div>':'')+'</details></div>';
+  }); }
+  box.innerHTML=out;
+}
 async function refresh(){ try{ state=await api('/api/admin/state'); render(); }catch(e){ document.getElementById('svc').textContent='未连接（先启动讲师机服务）'; document.getElementById('svc').className='pill'; } }
 document.getElementById('resetGroups').addEventListener('click',async function(){ if(!confirm('清空所有人的分组？学员需要重新抽签。'))return; await post('/api/admin/reset',{scope:'groups'}); refresh(); });
 
@@ -473,6 +506,7 @@ refresh();setInterval(refresh,2500);
     document.getElementById('pane-class').classList.toggle('hidden',t!=='class');
     document.getElementById('pane-hw').classList.toggle('hidden',t!=='hw');
     document.getElementById('pane-quiz').classList.toggle('hidden',t!=='quiz');
+    var ph=document.getElementById('pane-history'); if(ph)ph.classList.toggle('hidden',t!=='history');
     var pm=document.getElementById('pane-model'); if(pm)pm.classList.toggle('hidden',t!=='model');
     tabs.forEach(function(b){b.classList.toggle('on',b.getAttribute('data-tab')===t)});
     if(t==='hw'){var f=document.getElementById('hwFrame');if(f&&!f.getAttribute('src'))f.src=local?'grader?embed=1':'grader.html?embed=1'}
@@ -481,9 +515,9 @@ refresh();setInterval(refresh,2500);
   var hwPre=document.getElementById('hwFrame'); if(hwPre&&!hwPre.getAttribute('src'))hwPre.src=local?'grader?embed=1':'grader.html?embed=1';
   tabs.forEach(function(b){b.addEventListener('click',function(){show(b.getAttribute('data-tab'))})});
   window.YSCOT_showTab=show;
-  window.addEventListener('hashchange',function(){var x=(location.hash||'').replace('#','');if(['class','hw','quiz','model'].indexOf(x)>=0)show(x)});
+  window.addEventListener('hashchange',function(){var x=(location.hash||'').replace('#','');if(['class','hw','quiz','history','model'].indexOf(x)>=0)show(x)});
   var h=(location.hash||'').replace('#','');
-  show(['class','hw','quiz','model'].indexOf(h)>=0?h:'class');
+  show(['class','hw','quiz','history','model'].indexOf(h)>=0?h:'class');
 })();
 
 </script>
