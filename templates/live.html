@@ -169,6 +169,7 @@ var WS=[
  {t:'T5 项目协作',p:'15 分',inp:'项目信息、人员、资料',act:'建项目 / 拆任务 / 排期 / 归档',out:'项目工作台',ok:'责任到人、进度可视',files:[['T5 项目协作任务卡','t5-项目协作任务卡.md'],['T5 初始信息','t5-初始信息.md']]},
  {t:'T6 对外核对',p:'20 分',inp:'多方账目与资料',act:'交叉比对 / 差异定位',out:'对账差异报告',ok:'差异全找到、口径清楚',files:[['T6 结算规则与背景','t6-结算规则与背景.md'],['T6 执行方总账','t6-执行方总账.csv'],['T6 演出方','t6-演出方.csv'],['T6 场地方','t6-场地方.csv'],['T6 服务提供方','t6-服务提供方.csv'],['T6 渠道合作方','t6-渠道合作方.csv'],['T6 设施提供方','t6-设施提供方.csv']]}
 ];
+function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 var HWS=[
  {id:'T1',no:1,title:'1 号作业：方案文档',hint:'方案 md 文件',accept:'.md'},
  {id:'T2',no:2,title:'2 号作业：结果表格',hint:'结果表格 xlsx 文件',accept:'.xlsx,.xls'},
@@ -225,7 +226,7 @@ function renderHw(){
     var p=pending.filter(function(x){return x.task===h.id}).length;
     var sc=(s&&s.total>0)?(' · 得分 '+s.total+(s.grade?'（'+s.grade+'）':'')):'';
     var stat=ok?('已上传 '+s.files.length+' 个'+sc):(p?('待提交 '+p+' 个'):'未上传');
-    return '<div class="hw"><span class="no">'+h.no+'</span><span class="info"><b>'+h.title+'</b><span>'+h.hint+'</span></span>'+
+    return '<div class="hw"><span class="no">'+h.no+'</span><span class="info"><b>'+escHtml(h.title)+'</b><span>'+escHtml(h.hint)+'</span></span>'+
       '<span class="stat'+((ok||p)?' ok':'')+'">'+stat+'</span>'+
       '<label class="pick">选择文件<input type="file" data-hw="'+h.id+'" accept="'+h.accept+'" '+(h.multiple?'multiple':'')+' /></label></div>';
   }).join('');
@@ -325,12 +326,12 @@ function render(){
   }else{$('groupNone').classList.remove('hidden');$('groupGot').classList.add('hidden')}
   var rl=stateData.roll||{};
   var rcard=$('rollCard');
-  if(rcard){ rcard.classList.toggle('hidden',!rl.active); if(rl.active){ $('rollMsg').innerHTML=rl.selected?'<span style="color:var(--lime);font-size:24px">请回答</span>':'请关注 <b style="color:var(--lime)">'+(rl.name||'被抽中学员')+'</b>'; } }
+  if(rcard){ rcard.classList.toggle('hidden',!rl.active); if(rl.active){ $('rollMsg').innerHTML=rl.selected?'<span style="color:var(--lime);font-size:24px">请回答</span>':'请关注 <b style="color:var(--lime)">'+escHtml(rl.name||'被抽中学员')+'</b>'; } }
   var mc=$('matCard');
   if(mc){
     var mshow=!!(stateData.materialOpen&&stateData.materials&&stateData.materials.length);
     mc.classList.toggle('hidden',!mshow);
-    if(mshow){ $('matCount').textContent=stateData.materials.length+' 份'; $('matList').innerHTML=stateData.materials.map(function(f){return '<div style="padding:4px 0"><a href="'+f.url+'" target="_blank">'+f.name+'</a></div>'}).join(''); }
+    if(mshow){ $('matCount').textContent=stateData.materials.length+' 份'; $('matList').innerHTML=stateData.materials.map(function(f){return '<div style="padding:4px 0"><a href="'+f.url+'" target="_blank">'+escHtml(f.name)+'</a></div>'}).join(''); }
   }
   var qz=stateData.quiz||{active:false};
   var showQuiz=!!(qz.active||qz.submitted);
