@@ -254,6 +254,52 @@ base64 文件（≤ 10MB）：
 
 `task` 用 `T1`–`T6`；同一关卡重复导入会覆盖旧标准。
 
+### 5. 实际作业题目与评价维度
+
+作业配置以场次的实际任务为准，题量就是任务条数。新增：
+
+~~~json
+{
+  "name": "homework.add",
+  "arguments": {
+    "room": "YQ2X",
+    "title": "客户需求澄清作业",
+    "requirements": ["需求事实", "关键约束", "可执行性"],
+    "deliverable": "提交需求清单",
+    "acceptance": "事实可核对、约束无遗漏"
+  }
+}
+~~~
+
+查看和编辑：
+
+~~~json
+{"name":"homework.list","arguments":{"room":"YQ2X"}}
+~~~
+
+~~~json
+{
+  "name": "homework.update",
+  "arguments": {
+    "room": "YQ2X",
+    "id": "HW1",
+    "title": "客户需求澄清作业（修订）",
+    "requirements": ["事实", "约束", "风险"]
+  }
+}
+~~~
+
+删除：
+
+~~~json
+{"name":"homework.delete","arguments":{"room":"YQ2X","id":"HW1"}}
+~~~
+
+- 作业 id 由系统生成，格式为 HW1、HW2；
+- 最多 6 个作业，至少保留 1 个；
+- 新增/删除会直接改变实际数量，homework.list 返回当前 count；
+- 评分页顶部「作业设置」和 MCP 修改的是同一份数据。
+
 ## 六、AI Agent 推荐调用顺序
 
 1. `initialize` → `tools/list`，确认连接；
