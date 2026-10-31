@@ -289,7 +289,7 @@ function studentView(k){
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
-    quiz:(function(){var q=state.quiz||{};var p=q.paper;var a=(q.answers||{})[k];var qs=quizPaperFor(k);var tt=qs.reduce(function(x,y){return x+(y.score||0)},0);if(!p||!p.active)return {active:false,submitted:!!a,myScore:a?a.score:null,total:tt};return {active:true,submitted:!!a,myScore:a?a.score:null,total:tt,questions:qs.map(function(x){return {id:x.id,type:x.type,q:x.q,options:x.options||[],score:x.score}})};})(),
+    quiz:(function(){var q=state.quiz||{};var p=q.paper;var a=(q.answers||{})[k];var qs=quizPaperFor(k);var tt=qs.reduce(function(x,y){return x+(y.score||0)},0);if(!p||!p.active)return {active:false,submitted:!!a,myScore:a?a.score:null,total:a?(a.total||0):tt};return {active:true,submitted:!!a,myScore:a?a.score:null,total:tt,questions:qs.map(function(x){return {id:x.id,type:x.type,q:x.q,options:x.options||[],score:x.score}})};})(),
     groupCounts: groupCounts(),
     groups: Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name})),
     submissions: s? Object.keys(state.submissions).filter(k2=>k2.indexOf(k+'||')===0).map(k2=>{const p=k2.split('||');return {task:p[1],at:state.submissions[k2].at,total:(state.submissions[k2].score||{}).total||0,files:(state.submissions[k2].files||[]).length}}):[]
@@ -908,7 +908,7 @@ function screenView(){
     activeCard:(cfg.activeCard||''),activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===cfg.activeCard})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null})()
   };
 }
-function send(res,code,obj,type='application/json; charset=utf-8',extra){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); const _h={'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, X-MCP-Token','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}; if(extra&&typeof extra==='object')Object.assign(_h,extra); res.writeHead(code,_h); res.end(body); }
+function send(res,code,obj,type='application/json; charset=utf-8',extra){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); const _h={'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, X-MCP-Token','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}; if(typeof extra==='string'&&extra)_h['Content-Disposition']=extra; else if(extra&&typeof extra==='object')Object.assign(_h,extra); res.writeHead(code,_h); res.end(body); }
 function readRaw(req, limit){
   return new Promise((resolve,reject)=>{ const chunks=[]; let n=0; const max=limit||8*1024*1024;
     req.on('data',c=>{ n+=c.length; if(n>max){ reject(new Error('too large')); req.destroy(); return; } chunks.push(c); });
@@ -917,8 +917,8 @@ function readRaw(req, limit){
 function readBody(req,max){ const limit=Number(max)||2e6; return new Promise((resolve,reject)=>{ let d=''; req.on('data',c=>{d+=c; if(d.length>limit){reject(new Error('too large'));req.destroy()}}); req.on('end',()=>{ try{resolve(d?JSON.parse(d):{})}catch(e){resolve({})} }); req.on('error',reject); }); }
 const MIME={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.jpg':'image/jpeg'};
 const MAP=_IS_KIT
-  ? {'/':'promo.html','/promo':'promo.html','/live':'live.html','/live.html':'live.html','/course':'course/course.html','/course.html':'course/course.html','/grader':'course/grader.html','/grader.html':'course/grader.html','/admin':'course/admin.html','/admin.html':'course/admin.html','/ops':'course/admin.html','/join':'live.html','/screen':'screen.html','/course-screen':'course-screen.html','/remote':'remote.html','/login':'login.html','/shell':'course-shell.html','/teachers':'teachers.html','/packages':'packages.html','/report':'report.html','/package-edit':'package-edit.html','/room':'room.html','/home':'home.html','/room-setup':'room-setup.html','/demo':'demo.html','/architecture':'architecture.html','/scene':'scene.html'}
-  : {'/':'宣传页/课程大纲-宣传版.html','/promo':'宣传页/课程大纲-宣传版.html','/live':'宣传页/live.html','/live.html':'宣传页/live.html','/course':'课件/course.html','/course.html':'课件/course.html','/grader':'课件/grader.html','/grader.html':'课件/grader.html','/admin':'课件/admin.html','/admin.html':'课件/admin.html','/ops':'课件/admin.html','/join':'宣传页/live.html','/screen':'screen.html','/remote':'remote.html','/login':'login.html','/shell':'course-shell.html','/teachers':'teachers.html','/packages':'packages.html','/report':'report.html','/package-edit':'package-edit.html','/room':'room.html','/home':'home.html','/room-setup':'room-setup.html','/demo':'demo.html','/architecture':'architecture.html','/scene':'scene.html'};
+  ? {'/':'promo.html','/promo':'promo.html','/hw-setup':'hw-setup.html','/live':'live.html','/live.html':'live.html','/course':'course/course.html','/course.html':'course/course.html','/grader':'course/grader.html','/grader.html':'course/grader.html','/admin':'course/admin.html','/admin.html':'course/admin.html','/ops':'course/admin.html','/join':'live.html','/screen':'screen.html','/course-screen':'course-screen.html','/remote':'remote.html','/login':'login.html','/shell':'course-shell.html','/teachers':'teachers.html','/packages':'packages.html','/report':'report.html','/package-edit':'package-edit.html','/room':'room.html','/home':'home.html','/room-setup':'room-setup.html','/demo':'demo.html','/architecture':'architecture.html','/scene':'scene.html'}
+  : {'/':'宣传页/课程大纲-宣传版.html','/promo':'宣传页/课程大纲-宣传版.html','/hw-setup':'hw-setup.html','/live':'宣传页/live.html','/live.html':'宣传页/live.html','/course':'课件/course.html','/course.html':'课件/course.html','/grader':'课件/grader.html','/grader.html':'课件/grader.html','/admin':'课件/admin.html','/admin.html':'课件/admin.html','/ops':'课件/admin.html','/join':'宣传页/live.html','/screen':'screen.html','/remote':'remote.html','/login':'login.html','/shell':'course-shell.html','/teachers':'teachers.html','/packages':'packages.html','/report':'report.html','/package-edit':'package-edit.html','/room':'room.html','/home':'home.html','/room-setup':'room-setup.html','/demo':'demo.html','/architecture':'architecture.html','/scene':'scene.html'};
 function serveStatic(res,pathname){
   let rel=MAP[pathname] || decodeURIComponent(pathname).replace(/^\/+/,'');
   const abs=path.resolve(ROOT,rel);
@@ -1317,8 +1317,8 @@ const server=http.createServer(async (req,res)=>{
     const cookieTeacher=getCookieTeacher(req);
     const tokenTeacher=cookieTeacher?null:teacherByMcpToken(bearerToken(req));
     const teacher=cookieTeacher||tokenTeacher;
-    let htmlGuarded=(p==='/ops'||p==='/admin'||p==='/grader'||p==='/shell'||p==='/teachers'||p==='/packages'||p==='/report'||p==='/remote'||p==='/package-edit'||p==='/room'||p==='/home'||p==='/room-setup');
-    let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown')||(p==='/api/room/deletefile')||(p==='/api/room/renamefile');
+    let htmlGuarded=(p==='/hw-setup'||p==='/ops'||p==='/admin'||p==='/grader'||p==='/shell'||p==='/teachers'||p==='/packages'||p==='/report'||p==='/remote'||p==='/package-edit'||p==='/room'||p==='/home'||p==='/room-setup');
+    let apiGuarded=(p.indexOf('/api/admin')===0)||(p.indexOf('/api/teachers')===0)||(p.indexOf('/api/rooms')===0)||(p==='/api/report')||(p==='/api/report.csv')||(p.indexOf('/api/packages')===0)||(p.indexOf('/api/generate')===0)||(p.indexOf('/api/package')===0)||(p==='/api/extract')||(p==='/api/dingtalk/diag')||(p==='/api/dingtalk/debug')||(p==='/api/dingtalk/refresh')||(p==='/api/room/upload')||(p==='/api/room/markdown')||(p==='/api/room/deletefile')||(p==='/api/room/renamefile')||(p==='/api/quiz-export.csv')||(p==='/api/admin/homework/zip');
     if(p==='/report' && u.searchParams.get('embed')==='1') htmlGuarded=false;
     if(p==='/api/screen/perf'||p==='/api/screen/tab') apiGuarded=false;
     if(p==='/api/admin/homework/zip'&&req.method==='GET'){
@@ -1327,6 +1327,7 @@ const server=http.createServer(async (req,res)=>{
       if(_exp>Math.floor(Date.now()/1000)&&_sig&&_sig===hwZipSig(ctxRoom(),_exp,_task,_student)) apiGuarded=false;
     }
     if(p==='/api/report' && u.searchParams.get('embed')==='1') apiGuarded=false;
+    if(p==='/api/quiz-export.csv' && u.searchParams.get('embed')==='1') apiGuarded=false;
     if(htmlGuarded&&!teacher){ res.writeHead(302,{Location:'/login'}); return res.end(); }
     if(apiGuarded&&!teacher) return send(res,401,{ok:false,error:'login required'});
     if(apiGuarded&&tokenTeacher&&tokenTeacher.role!=='admin'){ const _rq=u.searchParams.get('room'); if(_rq){ if(!canMcpRoom(tokenTeacher,ctxRoom())) return send(res,403,{ok:false,error:'该 MCP 令牌无权访问这个场次'}); } else if(p!=='/api/rooms'&&p!=='/api/rooms/create'){ return send(res,403,{ok:false,error:'使用 MCP 令牌调用后台接口时必须带 ?room=场次码'}); } }
@@ -1445,6 +1446,7 @@ const server=http.createServer(async (req,res)=>{
           const csv='\ufeff'+rows.join('\r\n');
           return send(res,200,csv,'text/csv; charset=utf-8','attachment; filename="quiz-result-'+ctxRoom()+'.csv"');
         }
+        if(p==='/api/admin/tasks' && req.method==='GET') return send(res,200,{ok:true,tasks:state.tasks||[]});
         if(p==='/api/report.csv'){
           const lines=['姓名,尾号,小组,投票,抢答,作业数'];
           Object.keys(state.students).forEach(function(k){const st=state.students[k];const subs=Object.keys(state.submissions).filter(x=>x.indexOf(k+'||')===0).length;lines.push([st.name,st.tail,st.group||'',st.votes||0,st.buzzes||0,subs].join(','))});
@@ -1714,6 +1716,23 @@ const server=http.createServer(async (req,res)=>{
         }
         if(p==='/api/admin/workshopcfg'){ state.config=state.config||{}; state.config.wsMinutes=Math.max(1,Math.min(240,Number(b.minutes)||90)); save(); return send(res,200,{ok:true,wsMinutes:state.config.wsMinutes}); }
         if(p==='/api/admin/workshop'){ state.config=state.config||{}; state.config.workshopOpen=!!b.open; if(!b.open) state.config.activeCard=''; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,workshopOpen:state.config.workshopOpen}); }
+        if(p==='/api/admin/tasks'){
+          if(req.method==='GET') return send(res,200,{ok:true,tasks:state.tasks||[]});
+          const list=Array.isArray(b.tasks)?b.tasks:[];
+          state.tasks=list.slice(0,6).map(function(t,i){
+            return {
+              id:'HW'+(i+1),
+              title:String((t&&t.title)||('作业 '+(i+1))).trim().slice(0,80),
+              scenario:String((t&&t.scenario)||'').slice(0,500),
+              requirements:((t&&t.requirements)||[]).map(function(x){return String(x).slice(0,300)}).slice(0,20),
+              deliverable:String((t&&t.deliverable)||'').slice(0,500),
+              acceptance:String((t&&t.acceptance)||'').slice(0,500)
+            };
+          });
+          state.config=state.config||{}; state.config.hwCount=Math.max(1,Math.min(6,state.tasks.length||1));
+          state.updatedAt=new Date().toISOString(); save();
+          return send(res,200,{ok:true,count:state.tasks.length,tasks:state.tasks});
+        }
         if(p==='/api/admin/hwcfg'){ state.config=state.config||{}; state.config.hwCount=Math.max(1,Math.min(6,Number(b.count)||6)); state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,hwCount:hwCountOn()}); }
         if(p==='/api/admin/review'){ state.config=state.config||{}; state.config.reviewEnabled=!!b.open; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,reviewEnabled:reviewOn()}); }
         if(p==='/api/admin/hw'){ state.config=state.config||{hwOpen:false}; state.config.hwOpen=!!b.open; state.updatedAt=new Date().toISOString(); save(); return send(res,200,{ok:true,hwOpen:state.config.hwOpen}); }
@@ -1779,6 +1798,7 @@ const server=http.createServer(async (req,res)=>{
       return send(res,404,{ok:false,error:'no api'});
     }catch(e){ return send(res,500,{ok:false,error:String(e.message||e)}); }
   }
+  if(p==='/hw-setup'){ res.writeHead(302,{Location:'/grader'+(u.search||'')}); return res.end(); }
   if(p==='/'){
     const t=getTeacher(req);
     if(t){ res.writeHead(302,{Location:'/home'}); return res.end(); }

@@ -333,8 +333,19 @@ function render(){
     if(mshow){ $('matCount').textContent=stateData.materials.length+' 份'; $('matList').innerHTML=stateData.materials.map(function(f){return '<div style="padding:4px 0"><a href="'+f.url+'" target="_blank">'+f.name+'</a></div>'}).join(''); }
   }
   var qz=stateData.quiz||{active:false};
-  $('quizCard').classList.toggle('hidden',!qz.active);
-  if(qz.active){
+  var showQuiz=!!(qz.active||qz.submitted);
+  $('quizCard').classList.toggle('hidden',!showQuiz);
+  if(showQuiz&&!qz.active&&qz.submitted){
+    // 考试已结束：只展示最终得分
+    $('quizMeta').textContent='考试已结束';
+    $('quizList').innerHTML='<div style="text-align:center;padding:18px 0">'
+      +'<div style="font-size:12px;color:var(--muted);letter-spacing:.08em;margin-bottom:8px">在线考试得分</div>'
+      +'<div style="font-size:40px;font-weight:700;color:var(--amber-l);line-height:1.1">'+(qz.myScore!=null?qz.myScore:0)
+      +'<span style="font-size:18px;color:var(--muted);font-weight:400"> / '+qz.total+'</span></div>'
+      +'</div>';
+    $('quizSubmit').style.display='none';
+    $('quizMsg').textContent='以上是你的最终得分，记录已保存在课程系统里。';
+  } else if(qz.active){
     $('quizMeta').textContent=qz.submitted?('已提交 · 得分 '+qz.myScore+' / '+qz.total):('共 '+qz.questions.length+' 题 · 满分 '+qz.total);
     var ae0=document.activeElement;
     var editingQuiz=!!(ae0&&ae0.getAttribute&&(ae0.getAttribute('data-short')||ae0.getAttribute('data-blank')||(ae0.name&&ae0.name.indexOf('r-')===0)));

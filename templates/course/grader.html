@@ -38,6 +38,11 @@ body{animation:pageIn .32s ease both}
 @keyframes pageIn{from{opacity:0}to{opacity:1}}
 .embed body{padding:10px 12px 20px}
 .embed .head{display:none}
+  .setup-card{margin-bottom:14px}.setup-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .task-card{border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:10px;background:rgba(255,255,255,.025)}
+  .task-card .th{display:flex;align-items:center;gap:8px;margin-bottom:8px}.task-card .no{width:24px;height:24px;border-radius:50%;background:var(--amber);color:#1a1206;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .task-card label{display:block;font-size:11px;color:var(--muted);margin-top:6px}.task-card input,.task-card textarea{width:100%;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 9px;font-size:12.5px;font-family:inherit}
+  .task-card textarea{min-height:44px;resize:vertical}.task-card .th b{font-size:13px}.setup-msg{font-size:12px;color:var(--muted)}
   .taskcol{min-width:96px;max-width:170px;vertical-align:top}.taskname{font-size:10.5px;color:var(--muted);font-weight:400;line-height:1.35;margin-top:2px;white-space:normal}
   .dims{font-size:11.5px;color:var(--muted);line-height:1.6;margin:4px 0 6px}
 </style><script src="/dialog.js"></script>
@@ -56,6 +61,14 @@ body{animation:pageIn .32s ease both}
     <a data-nav="admin" href="admin.html">课堂页后台</a>
     <a data-nav="live" href="../live.html" target="_blank">学员页</a>
   </div>
+</div>
+
+<div class="card setup-card">
+  <div class="setup-head">
+    <div><div class="k">作业设置（题目 / 评价维度 / 数量）</div><div class="small muted">上面设置作业，下面直接评分；保存后评分区立即刷新。</div></div>
+    <div class="rowflex"><button class="btn ghost" id="taskAdd">+ 添加作业</button><button class="btn" id="taskSave">保存作业设置</button><span class="setup-msg" id="taskMsg"></span></div>
+  </div>
+  <div id="taskEdit"></div>
 </div>
 
 <div class="card">
@@ -112,7 +125,7 @@ var TASKS=[
   auto:[{t:'报告结构',pts:3,type:'kw',kw:['汇总','逐项','建议'],per:1},{t:'差异类型覆盖',pts:7,type:'kw',kw:['重复','金额','数量','口径','漏记','跨期','优惠'],per:1},{t:'责任方定位',pts:2,type:'kw',kw:['演出方','场地方','设施','渠道','服务提供方','执行方'],per:2},{t:'差异合计',pts:2,type:'kw',kw:['57,900','57900','5.79'],per:2}],
   manual:[],crit:[['差异召回（10处）',10,'每处1分；漏报扣分'],['定位准确（方名+项目名）',3,'写清在哪一方的哪一行'],['金额核对',3,'差异金额与教师版一致'],['处理建议合理',4,'可执行、责任到方']]}
 ];
-var st=null, curKey='', hwOpen=false, reviewOpen=true;
+var st=null, curKey='', hwOpen=false, reviewOpen=true, setupTasks=[], taskDirty=false;
 document.getElementById('downloadAll').onclick=function(){var a=document.createElement('a');a.href=API+'/api/admin/homework/zip';a.download='';document.body.appendChild(a);a.click();a.remove();};
 var ALL_TASKS=TASKS.slice(); var HWCOUNT=6;
 function buildTasks(d){
@@ -138,6 +151,49 @@ function buildTasks(d){
 
 function $(id){return document.getElementById(id)}
 function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function taskNorm(t){ return {title:String(t.title||'').trim(),requirements:(t.requirements||[]).map(function(x){return String(x).trim()}).filter(Boolean),deliverable:String(t.deliverable||''),acceptance:String(t.acceptance||'')}; }
+function setupFromState(tasks){ setupTasks=(tasks||[]).map(taskNorm); }
+function renderTaskEdit(){
+  var box=$('taskEdit'); if(!box)return;
+  if(!setupTasks.length){ box.innerHTML='<div class="muted small" style="padding:10px 0">还没有作业，点右上「添加作业」开始设置。</div>'; return; }
+  box.innerHTML=setupTasks.map(function(t,i){
+    return '<div class="task-card" data-ti="'+i+'"><div class="th"><span class="no">'+(i+1)+'</span><b>'+escH(t.title||'（未填题目）')+'</b><button class="btn sm danger" data-tdel="'+i+'" style="margin-left:auto">删除</button></div>'+
+      '<label>题目</label><input data-tf="title" value="'+escH(t.title)+'" placeholder="学员看到的作业题目" />'+
+      '<label>评价维度（每行一条）</label><textarea data-tf="requirements" placeholder="例：需求事实\n关键约束\n可执行性">'+escH((t.requirements||[]).join('\n'))+'</textarea>'+
+      '<label>提交要求（可选）</label><textarea data-tf="deliverable" placeholder="学员看到的说明">'+escH(t.deliverable)+'</textarea>'+
+      '<label>验收标准（可选）</label><input data-tf="acceptance" value="'+escH(t.acceptance)+'" placeholder="用于评分参考" />'+
+      '</div>';
+  }).join('');
+  box.querySelectorAll('[data-tf]').forEach(function(el){ el.addEventListener('input',function(){
+    var i=Number(el.closest('.task-card').getAttribute('data-ti')); var f=el.getAttribute('data-tf');
+    if(f==='requirements') setupTasks[i].requirements=el.value.split(/\r?\n/).map(function(x){return x.trim()}).filter(Boolean);
+    else setupTasks[i][f]=el.value;
+    if(f==='title'){var b=el.closest('.task-card').querySelector('.th b');if(b)b.textContent=el.value||'（未填题目）'}
+    taskDirty=true;
+  }); });
+  box.querySelectorAll('[data-tdel]').forEach(function(b){b.addEventListener('click',function(){
+    var i=Number(b.getAttribute('data-tdel')); if(!confirm('删除第 '+(i+1)+' 个作业？'))return;
+    setupTasks.splice(i,1); taskDirty=true; renderTaskEdit();
+  }); });
+}
+async function saveTaskSetup(){
+  var msg=$('taskMsg'), valid=setupTasks.filter(function(t){return String(t.title||'').trim()});
+  if(!valid.length){ alert('至少填写一个作业题目'); return; }
+  if(valid.length>6){ alert('最多 6 个作业'); return; }
+  msg.textContent='保存中…';
+  try{
+    var d=await api('/api/admin/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:valid.map(taskNorm)})});
+    if(!d.ok) throw new Error(d.error||'保存失败');
+    setupFromState(d.tasks||[]); taskDirty=false;
+    st=st||{}; st.tasks=d.tasks||[];
+    TASKS=buildTasks(st); HWCOUNT=TASKS.length;
+    renderTaskEdit(); renderMatrix(); renderSubs(); renderCrit();
+    msg.textContent='已保存 '+d.count+' 个作业';
+  }catch(e){ msg.textContent='保存失败：'+e.message; }
+}
+function addTask(){ if(setupTasks.length>=6){alert('最多 6 个作业');return} setupTasks.push({title:'',requirements:[],deliverable:'',acceptance:''}); taskDirty=true; renderTaskEdit(); }
+
+
 function fmt(n){return Math.round(n*10)/10}
 function autoScore(t,text){
   text=text||''; var s=0;
@@ -167,6 +223,7 @@ async function refresh(){
     st=await api('/api/admin/state');
     $('svc').textContent='已连接';$('svc').className='pill on';
     TASKS=buildTasks(st); HWCOUNT=TASKS.length;
+    if(!taskDirty){ setupFromState(st.tasks); renderTaskEdit(); }
     hwOpen=!!(st.config&&st.config.hwOpen); reviewOpen=st.reviewEnabled!==false; syncHw(); syncReview(); renderMatrix(); renderSubs(); renderCrit();
   }catch(e){ $('svc').textContent='未连接';$('svc').className='pill'; }
 }
@@ -311,6 +368,8 @@ document.addEventListener('click',async function(e){
     try{await post('/api/admin/score',{key:k2,manual:s.manual||[],score:{auto:0,manual:v,break:0,total:Math.min(t.pts,v),override:Math.min(t.pts,v)}});await refresh();openSubmission(k2)}catch(err){alert('保存失败')}
   }
 });
+$('taskAdd').addEventListener('click',addTask);
+$('taskSave').addEventListener('click',saveTaskSetup);
 refresh();setInterval(refresh,5000);
 </script>
 <script>(function(){var local=(location.port==='8899'||location.protocol==='file:');var map=local?{course:'/course',admin:'/admin',grader:'/grader',live:'/live',promo:'/promo'}:{course:'course.html',admin:'admin.html',grader:'grader.html',live:'../live.html',promo:'../index.html'};document.querySelectorAll('[data-nav]').forEach(function(a){var k=a.getAttribute('data-nav');if(map[k])a.setAttribute('href',map[k])})})();</script>

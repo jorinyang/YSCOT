@@ -22,10 +22,11 @@ body.embed .card{border-radius:14px}
 <div class="card"><div class="k">课堂概览</div><div id="sum" class="small"></div></div>
 <div class="card"><div class="k">学员与作业</div><div style="overflow:auto"><table id="stu"></table></div></div>
 <div class="card"><div class="k">小组</div><div style="overflow:auto"><table id="grp"></table></div></div>
-<div class="card"><div class="k">答题</div><div style="overflow:auto"><table id="quiz"></table></div></div>
+<div class="card"><div class="k" style="display:flex;justify-content:space-between;align-items:center"><span>答题</span><a id="quizcsv" href="#" style="font-size:12px">下载答题结果 CSV（含分数）</a></div><div style="overflow:auto"><table id="quiz"></table></div></div>
 <script>
 var q=new URLSearchParams(location.search), ROOM=(q.get('room')||'').toUpperCase(), EMBED=q.get('embed')==='1';
 if(EMBED) document.body.classList.add('embed');
+var _qc=document.getElementById('quizcsv'); if(_qc)_qc.href='/api/quiz-export.csv'+(ROOM?('?room='+ROOM):'');
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
 fetch('/api/report'+(ROOM?('?room='+ROOM+'&embed=1'):'?embed=1')).then(function(r){return r.json()}).then(function(d){
   document.getElementById('title').textContent='课堂报告 · '+d.room;
