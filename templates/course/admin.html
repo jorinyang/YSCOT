@@ -38,6 +38,15 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 body{animation:pageIn .32s ease both}
 @keyframes pageIn{from{opacity:0}to{opacity:1}}
 #groupStats table th,#groupStats table td{text-align:center}
+#matList{margin-top:8px}
+#matList input[type=checkbox]{width:15px!important;height:15px!important;min-width:15px!important;flex:0 0 15px;padding:0!important;margin:0;accent-color:#D98A2B;border-radius:3px}
+.mat-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.07);min-width:0}
+.mat-check{display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer}
+.mat-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#F4EFE2;text-decoration:none;font-size:12px}
+.mat-name:hover{color:#E9B45C}
+.mat-status{flex:0 0 auto;font-size:11px;color:#9DB3A6}
+.mat-del{flex:0 0 auto}
+
 
 .tabs{display:flex;gap:8px;margin:4px 0 14px}
 .tabbtn{padding:8px 18px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:#CFDCD2;font-size:13.5px;cursor:pointer;font-family:inherit}
@@ -211,7 +220,7 @@ async function api(p,opt){
   return await r.json();
 }
 async function post(p,body){return api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
-var state=null,editingKey=null,quizFormInit=false,quizFormDirty=false;
+var state=null,editingKey=null,quizFormInit=false,quizFormDirty=false,matSelected={};
 var _rm=(document.cookie.match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/)||[])[1];
 var ROOM=(new URLSearchParams(location.search).get('room')||_rm||'ROOM0').toUpperCase();
 (function(){var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0&&u.indexOf('room=')<0)u+=(u.indexOf('?')>=0?'&':'?')+'room='+encodeURIComponent(ROOM);return f(u,o)}})();
@@ -530,15 +539,19 @@ refresh();setInterval(refresh,2500);
       var ext=window.__extMaterials||[];
       var items=fs.map(function(f){
         var sent=f.released!==false, status=sent?('已发送'+(f.batch?(' · 第'+f.batch+'批'):'')):'待发送';
-        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><label style="display:flex;align-items:center;gap:7px;min-width:0;flex:1"><input type="checkbox" data-matpick value="'+encodeURIComponent(f.stored)+'" /> <a href="'+f.url+'" target="_blank" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.name+'</a></label><span class="muted small">'+status+'</span><button class="btn sm danger" data-mdel="'+encodeURIComponent(f.stored)+'" data-mname="'+encodeURIComponent(f.name)+'">删除</button></div>'}).concat(ext.map(function(f){return '<div><a href="'+f.url+'" target="_blank">'+f.name+'</a> <span class="muted small">外链</span></div>'}));
+        var checked=matSelected[f.stored]?' checked':'';
+        return '<div class="mat-row"><label class="mat-check"><input type="checkbox" class="mat-pick" data-matpick value="'+encodeURIComponent(f.stored)+'"'+checked+' /><a class="mat-name" href="'+f.url+'" target="_blank">'+f.name+'</a></label><span class="mat-status">'+status+'</span><button class="btn sm danger mat-del" data-mdel="'+encodeURIComponent(f.stored)+'" data-mname="'+encodeURIComponent(f.name)+'">删除</button></div>'}).concat(ext.map(function(f){return '<div class="mat-row"><a class="mat-name" href="'+f.url+'" target="_blank">'+f.name+'</a><span class="mat-status">外链</span></div>'}));
       var ml=document.getElementById('matList');
       if(ml){
         ml.innerHTML=items.length?items.join(''):'<span class="muted">还没有素材文件</span>';
+        ml.querySelectorAll('[data-matpick]').forEach(function(cb){ cb.addEventListener('change',function(){
+          var k=decodeURIComponent(cb.value); if(cb.checked)matSelected[k]=1; else delete matSelected[k];
+        }); });
         ml.querySelectorAll('[data-mdel]').forEach(function(b){b.onclick=function(){
           var stored=decodeURIComponent(b.getAttribute('data-mdel'));
           var shown=decodeURIComponent(b.getAttribute('data-mname')||stored);
           if(!confirm('删除素材「'+shown+'」？删除后学员端和大屏将无法访问。'))return;
-          post('/api/room/deletefile?room='+ROOM,{stored:stored}).then(function(d){ if(d.ok)load(); else alert(d.error||'删除失败'); });
+          post('/api/room/deletefile?room='+ROOM,{stored:stored}).then(function(d){ if(d.ok){delete matSelected[stored];load();} else alert(d.error||'删除失败'); });
         }});
       }
     }).catch(function(){});
@@ -556,7 +569,7 @@ refresh();setInterval(refresh,2500);
       var msg=document.getElementById('matBatchMsg');
       if(!d.ok){if(msg)msg.textContent=d.error||'操作失败';return}
       if(msg)msg.textContent=(open?('已发送 '+d.count+' 个 · 第 '+d.batch+' 批'):('已撤回 '+d.count+' 个'));
-      load();
+      matSelected={}; load();
     });
   }
   document.getElementById('matSend').onclick=function(){ releaseMaterials(true); };
