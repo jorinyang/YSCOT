@@ -171,12 +171,12 @@ var WS=[
 ];
 function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 var HWS=[
- {id:'T1',no:1,title:'1 号作业：方案文档',hint:'方案 md / json 文件',accept:'.md,.json'},
- {id:'T2',no:2,title:'2 号作业：结果表格',hint:'结果表格 xlsx，或 md / json 文件',accept:'.xlsx,.xls,.md,.json'},
+ {id:'T1',no:1,title:'1 号作业：方案文档',hint:'方案 md / json / html 文件',accept:'.md,.json,.html,.htm'},
+ {id:'T2',no:2,title:'2 号作业：结果表格',hint:'结果表格 xlsx，或 md / json / html 文件',accept:'.xlsx,.xls,.md,.json,.html,.htm'},
  {id:'T3',no:3,title:'3 号作业：汇报与推介',hint:'PPTX / HTML，或 md / json 文件',accept:'.pptx,.html,.htm,.md,.json'},
- {id:'T4',no:4,title:'4 号作业：宣传物料包',hint:'ZIP 压缩包，或 md / json 文件',accept:'.zip,.md,.json'},
- {id:'T5',no:5,title:'5 号作业：项目截图',hint:'截图，或 md / json 文件',accept:'image/jpeg,image/png,.md,.json',multiple:true},
- {id:'T6',no:6,title:'6 号作业：对账情况报告',hint:'对账报告 md / json 文件',accept:'.md,.json'}
+ {id:'T4',no:4,title:'4 号作业：宣传物料包',hint:'ZIP 压缩包，或 md / json / html 文件',accept:'.zip,.md,.json,.html,.htm'},
+ {id:'T5',no:5,title:'5 号作业：项目截图',hint:'截图，或 md / json / html 文件',accept:'image/jpeg,image/png,.md,.json,.html,.htm',multiple:true},
+ {id:'T6',no:6,title:'6 号作业：对账情况报告',hint:'对账报告 md / json / html 文件',accept:'.md,.json,.html,.htm'}
 ];
 try{var raw=localStorage.getItem(KEY);if(raw){var o=JSON.parse(raw);me.name=o.name||'';me.tail=o.tail||''}}catch(e){}
 var $=function(id){return document.getElementById(id)};
@@ -209,7 +209,7 @@ function renderHw(){
     } else { qa.innerHTML=''; }
   }
   if(stateData&&stateData.tasks&&stateData.tasks.length){
-    HWS=stateData.tasks.map(function(t,i){return {id:t.id,no:i+1,title:(i+1)+' 号作业：'+t.title,hint:t.deliverable||'按题目要求提交',accept:'.md,.txt,.json,.docx,.pdf,.pptx,.xlsx,.zip,.png,.jpg,.jpeg'}});
+    HWS=stateData.tasks.map(function(t,i){return {id:t.id,no:i+1,title:(i+1)+' 号作业：'+t.title,hint:t.deliverable||'按题目要求提交',accept:'.md,.txt,.json,.html,.htm,.docx,.pdf,.pptx,.xlsx,.zip,.png,.jpg,.jpeg'}});
   }
   var subs=submittedTasks();
   var open=!!(stateData&&stateData.hwOpen);
