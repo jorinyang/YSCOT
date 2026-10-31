@@ -236,13 +236,13 @@ function renderMatrix(){
   var html='<thead><tr><th>姓名</th><th>组</th>'+TASKS.map(function(t){return '<th class="taskcol" title="'+escH(t.id+' '+t.name)+'">'+escH(t.id)+'<div class="taskname">'+escH(t.name)+'</div></th>'}).join('')+'<th>总分</th><th>操作</th></tr></thead><tbody>';
   students.forEach(function(sd){
     var key=sd.name+'|'+sd.tail; var tot=0;
-    html+='<tr><td>'+sd.name+' <span class="muted">'+sd.tail+'</span></td><td>'+(sd.group||'-')+'</td>';
+    html+='<tr><td>'+escH(sd.name)+' <span class="muted">'+escH(sd.tail)+'</span></td><td>'+escH(sd.group||'-')+'</td>';
     TASKS.forEach(function(t){
       var s=subOf(key,t.id);
       var done=s?totalOf(t,s):null; tot+=done?done.total:0;
       html+='<td>'+(s?('<span class="dot '+(done.total>=t.pts*0.6?'ok':'part')+'"></span> '+done.total):'<span class="dot"></span>')+'</td>';
     });
-    html+='<td><b>'+fmt(tot)+'</b></td><td><a href="#" data-open="'+key+'">详情</a></td></tr>';
+    html+='<td><b>'+fmt(tot)+'</b></td><td><a href="#" data-open="'+escH(key)+'">详情</a></td></tr>';
   });
   html+='</tbody>';
   $('tbl').innerHTML=html;
@@ -255,8 +255,8 @@ function renderSubs(){
   var html='<thead><tr><th>姓名</th><th>任务</th><th>文件</th><th>总分</th><th>操作</th></tr></thead><tbody>';
   rows.forEach(function(x){
     var t=taskOf(x.task)||{pts:20,name:x.task}; var r=totalOf(t,x);
-    html+='<tr><td>'+x.name+'</td><td>'+x.task+' '+t.name+'</td><td>'+((x.files||[]).length)+' 个</td><td>'+r.total+' / '+t.pts+'</td>'+
-      '<td class="rowflex"><a href="#" data-open="'+x.key+'">查看/评分</a> <button class="btn sm danger" data-del="'+x.key+'">删</button></td></tr>';
+    html+='<tr><td>'+escH(x.name)+'</td><td>'+escH(x.task)+' '+escH(t.name)+'</td><td>'+((x.files||[]).length)+' 个</td><td>'+r.total+' / '+t.pts+'</td>'+
+      '<td class="rowflex"><a href="#" data-open="'+escH(x.key)+'">查看/评分</a> <button class="btn sm danger" data-del="'+escH(x.key)+'">删</button></td></tr>';
   });
   $('subs').innerHTML=html+'</tbody>';
 }
@@ -264,26 +264,26 @@ function renderSubs(){
 function openSubmission(key){
   curKey=key;
   var sd=(st.students||[]).filter(function(z){return (z.name+'|'+z.tail)===key})[0]||{name:key,group:'-'};
-  var body='<div class="k">'+sd.name+' · '+(sd.group||'未分组')+'</div>';
+  var body='<div class="k">'+escH(sd.name)+' · '+escH(sd.group||'未分组')+'</div>';
   TASKS.forEach(function(t){
     var s=subOf(key,t.id); if(!s) return;
     var r=totalOf(t,s);
-    body+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+t.id+' '+t.name+'</b><span class="pill">'+r.total+' / '+t.pts+' 分'+(r.override!=null?' · 人工定分':'')+'</span></div>';
+    body+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+escH(t.id)+' '+escH(t.name)+'</b><span class="pill">'+r.total+' / '+t.pts+' 分'+(r.override!=null?' · 人工定分':'')+'</span></div>';
     if((t.requirements||[]).length) body+='<div class="dims">评价维度：'+t.requirements.map(escH).join(' / ')+'</div>';
     body+='<div class="rowflex" style="margin:6px 0"><button class="btn sm ai" data-ai="'+t.id+'" style="padding:3px 10px;font-size:12px" '+(reviewOpen?'':'disabled')+'>AI 评分</button><span class="muted small">'+(reviewOpen?'模型按评分标准打分，可再人工改':'评审已关闭，仅保留已上传作业')+'</span></div>';
     body+='<div class="small muted" style="margin:6px 0">自动 '+r.auto+' · 人工 '+r.manual+' · 拆解 '+r.break+'（三问达标 '+r.breakN+'/3）</div>';
     if((s.files||[]).length){
-      body+='<div style="margin:6px 0">产物文件：'+s.files.map(function(f,i){return '<a href="'+API+'/api/file?key='+encodeURIComponent(s.key)+'&task='+s.task+'&i='+i+'" target="_blank">'+f.name+'（'+Math.round((f.size||0)/1024)+'KB）</a>'}).join('、')+'</div>';
+      body+='<div style="margin:6px 0">产物文件：'+s.files.map(function(f,i){return '<a href="'+API+'/api/file?key='+encodeURIComponent(s.key)+'&task='+encodeURIComponent(s.task)+'&i='+i+'" target="_blank">'+escH(f.name)+'（'+Math.round((f.size||0)/1024)+'KB）</a>'}).join('、')+'</div>';
     }else{ body+='<div class="muted" style="font-size:12px">未上传文件</div>'; }
-    if(s.text){ body+='<details style="margin:6px 0"><summary class="muted" style="font-size:12px;cursor:pointer">查看提交内容</summary><div style="white-space:pre-wrap;font-size:12px;line-height:1.7;margin-top:6px;max-height:220px;overflow:auto">'+s.text.replace(/</g,'&lt;')+'</div></details>'; }
+    if(s.text){ body+='<details style="margin:6px 0"><summary class="muted" style="font-size:12px;cursor:pointer">查看提交内容</summary><div style="white-space:pre-wrap;font-size:12px;line-height:1.7;margin-top:6px;max-height:220px;overflow:auto">'+escH(s.text)+'</div></details>'; }
     if((t.manual||[]).length){
       body+='<div class="k" style="margin-top:8px">人工核对</div>';
       t.manual.forEach(function(c){
         var on=(s.manual||[]).indexOf(c.t)>=0;
-        body+='<label class="check"><input type="checkbox" data-man="'+s.key+'" data-item="'+c.t+'" '+(on?'checked':'')+' '+(reviewOpen?'':'disabled')+' /> '+c.t+'（'+c.pts+'分）</label>';
+        body+='<label class="check"><input type="checkbox" data-man="'+escH(s.key)+'" data-item="'+escH(c.t)+'" '+(on?'checked':'')+' '+(reviewOpen?'':'disabled')+' /> '+escH(c.t)+'（'+c.pts+'分）</label>';
       });
     }
-    body+='<div class="rowflex" style="margin-top:10px"><input type="number" id="ovr-'+s.key.replace(/\|/g,'-')+'" placeholder="人工总分" value="'+(r.override!=null?r.override:'')+'" '+(reviewOpen?'':'disabled')+' style="width:100px;padding:5px 8px;font-size:12px" /><button class="btn sm" data-ovr="'+s.key+'" '+(reviewOpen?'':'disabled')+'>存人工分</button><button class="btn sm danger" data-del="'+s.key+'">删除此提交</button></div></div>';
+    body+='<div class="rowflex" style="margin-top:10px"><input type="number" id="ovr-'+escH(s.key.replace(/\|/g,'-'))+'" placeholder="人工总分" value="'+(r.override!=null?r.override:'')+'" '+(reviewOpen?'':'disabled')+' style="width:100px;padding:5px 8px;font-size:12px" /><button class="btn sm" data-ovr="'+escH(s.key)+'" '+(reviewOpen?'':'disabled')+'>存人工分</button><button class="btn sm danger" data-del="'+escH(s.key)+'">删除此提交</button></div></div>';
   });
   $('detailBody').innerHTML=body;
   [].slice.call($('detailBody').querySelectorAll('[data-ai]')).forEach(function(b){
@@ -315,7 +315,7 @@ function openSubmission(key){
 
 function renderCrit(){
   $('critBody').innerHTML=TASKS.map(function(t){
-    return '<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px"><b style="color:var(--amber-l)">'+t.id+' '+t.name+'（'+t.pts+'分）</b><div style="font-size:11.5px;line-height:1.9;margin-top:4px">'+t.crit.map(function(c,i){return (i+1)+'. '+c[0]+'（'+c[1]+'分）<span class="muted">——'+c[2]+'</span>'}).join('<br>')+'</div></div>';
+    return '<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px"><b style="color:var(--amber-l)">'+escH(t.id)+' '+escH(t.name)+'（'+t.pts+'分）</b><div style="font-size:11.5px;line-height:1.9;margin-top:4px">'+t.crit.map(function(c,i){return (i+1)+'. '+escH(c[0])+'（'+c[1]+'分）<span class="muted">——'+escH(c[2])+'</span>'}).join('<br>')+'</div></div>';
   }).join('');
 }
 
