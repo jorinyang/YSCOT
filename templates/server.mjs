@@ -389,6 +389,10 @@ function mcpToolDefs(){
     {name:'score.adjust',description:'调整小组表现分',inputSchema:{type:'object',properties:{room:{type:'string'},group:{type:'string'},delta:{type:'number'}},required:['room','group','delta']}},
     {name:'report.export',description:'导出课堂报告',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
     {name:'homework.download',description:'批量下载学员作业文件。返回带签名的 zip 下载地址，可直接 HTTP GET；支持按任务(task)或学员(student=姓名|尾号)筛选。',inputSchema:{type:'object',properties:{room:{type:'string'},task:{type:'string'},student:{type:'string'}},required:['room']}},
+    {name:'homework.list',description:'列出当前场次的实际作业（题目、评价维度、验收标准、数量）。',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
+    {name:'homework.add',description:'新增一道作业；title 必填，requirements 是评价维度数组，deliverable/acceptance 可选。数量随实际作业增加。',inputSchema:{type:'object',properties:{room:{type:'string'},title:{type:'string'},requirements:{type:'array',items:{type:'string'}},deliverable:{type:'string'},acceptance:{type:'string'},scenario:{type:'string'}},required:['room','title']}},
+    {name:'homework.update',description:'编辑实际作业；用 id 指定，title/requirements/deliverable/acceptance/scenario 按需更新。',inputSchema:{type:'object',properties:{room:{type:'string'},id:{type:'string'},title:{type:'string'},requirements:{type:'array',items:{type:'string'}},deliverable:{type:'string'},acceptance:{type:'string'},scenario:{type:'string'}},required:['room','id']}},
+    {name:'homework.delete',description:'删除实际作业；用 id 指定。删除后数量自动减少，其他作业 id 不变。',inputSchema:{type:'object',properties:{room:{type:'string'},id:{type:'string'}},required:['room','id']}},
     {name:'screen.url',description:'取大屏地址',inputSchema:{type:'object',properties:{room:{type:'string'}},required:['room']}},
     {name:'material.put',description:'导入课程素材。data_base64 写入房间素材库；url 登记外链。返回素材与下载地址。',inputSchema:{type:'object',properties:{room:{type:'string'},name:{type:'string'},filename:{type:'string'},data_base64:{type:'string'},url:{type:'string'},type:{type:'string'},description:{type:'string'}},required:['room','name']}},
     {name:'card.put',description:'导入行动卡或场景卡；带 id 为更新，不带为新增。',inputSchema:{type:'object',properties:{room:{type:'string'},id:{type:'string'},theme:{type:'string'},type:{type:'string'},content:{type:'string'},attrs:{type:'string'}},required:['room','theme']}},
@@ -461,6 +465,10 @@ curl -s https://yscot.clawshell.online/mcp \
   <tr><td><code>remote.state</code></td><td>读取遥控器状态</td><td><code>room</code>；返回投票、答题、计时、分组、卡片</td></tr>
   <tr><td><code>remote.control</code></td><td>执行遥控器动作</td><td><code>room, action</code>；如 <code>screen.set</code>、<code>material.toggle</code>、<code>roll.start</code>、<code>poll.start</code>、<code>timer.start</code></td></tr>
   <tr><td><code>homework.download</code></td><td>批量下载学员作业</td><td><code>room, task?, student?</code>；返回带签名的 zip 地址</td></tr>
+  <tr><td><code>homework.list</code></td><td>查看实际作业</td><td><code>room</code>；返回题目、评价维度、验收标准、数量</td></tr>
+  <tr><td><code>homework.add</code></td><td>新增一道作业</td><td><code>room, title, requirements[], deliverable?, acceptance?</code></td></tr>
+  <tr><td><code>homework.update</code></td><td>编辑作业</td><td><code>room, id, title?, requirements[]?, deliverable?, acceptance?</code></td></tr>
+  <tr><td><code>homework.delete</code></td><td>删除作业</td><td><code>room, id</code></td></tr>
   </table>
   <h2>5. 也可直接调 /api 后台（可选）</h2>
   <p>同一个个人 token 也能直接调用 /api 后台接口，不需要教师登录 Cookie。必须带 <code>?room=场次码</code>；token 只能操作自己的场次。</p>
@@ -481,6 +489,14 @@ curl -s https://yscot.clawshell.online/mcp \
   </main></body></html>`;
 }
 
+function mcpTaskReq(v){
+  if(Array.isArray(v)) return v.map(function(x){return String(x).trim()}).filter(Boolean).slice(0,20);
+  return String(v==null?'':v).split(/\r?\n|[,，;；]/).map(function(x){return x.trim()}).filter(Boolean).slice(0,20);
+}
+function mcpTaskView(t){ return {id:String(t.id||''),title:String(t.title||''),requirements:(t.requirements||[]).map(String),deliverable:String(t.deliverable||''),acceptance:String(t.acceptance||''),scenario:String(t.scenario||'')}; }
+function mcpTaskIndex(tasks,id){ const key=String(id||'').trim(); return (tasks||[]).findIndex(function(t){return String(t.id)===key}); }
+function mcpTaskNextId(tasks){ let max=0; (tasks||[]).forEach(function(t){const m=/^HW(\d+)$/i.exec(String(t.id||'')); if(m)max=Math.max(max,Number(m[1]));}); return 'HW'+(max+1); }
+function mcpTaskSyncCount(){ state.config=state.config||{}; state.config.hwCount=Math.max(1,Math.min(6,(state.tasks||[]).length||1)); }
 async function mcpHandle(msg, mcpTeacher, mcpBase){
   const id=(msg&&msg.id!==undefined)?msg.id:null;
   const method=msg&&msg.method;
@@ -625,6 +641,36 @@ async function mcpHandle(msg, mcpTeacher, mcpBase){
       }
       if(name==='report.export'){ return reply({content:[{type:'text',text:JSON.stringify({room:ctxRoom(),students:Object.keys(state.students).length,groups:screenView().groups,quiz:screenView().quiz,poll:screenView().poll})}]}); }
       if(name==='screen.url'){ return reply({content:[{type:'text',text:JSON.stringify({url:'/screen?room='+room})}]}); }
+      if(name==='homework.list'){
+        state.tasks=state.tasks||[];
+        return reply({content:[{type:'text',text:JSON.stringify({ok:true,count:state.tasks.length,tasks:state.tasks.map(mcpTaskView)})}]});
+      }
+      if(name==='homework.add'){
+        const title=String(a.title||'').trim(); if(!title) return reply({isError:true,content:[{type:'text',text:'title 必填'}]});
+        state.tasks=state.tasks||[]; if(state.tasks.length>=6) return reply({isError:true,content:[{type:'text',text:'最多 6 个作业'}]});
+        const task={id:mcpTaskNextId(state.tasks),title:title.slice(0,80),requirements:mcpTaskReq(a.requirements),deliverable:String(a.deliverable||'').slice(0,500),acceptance:String(a.acceptance||'').slice(0,500),scenario:String(a.scenario||'').slice(0,500)};
+        state.tasks.push(task); mcpTaskSyncCount(); state.updatedAt=new Date().toISOString(); save();
+        return reply({content:[{type:'text',text:JSON.stringify({ok:true,count:state.tasks.length,task:mcpTaskView(task)})}]});
+      }
+      if(name==='homework.update'){
+        const tasks=state.tasks||[]; const idx=mcpTaskIndex(tasks,a.id);
+        if(idx<0) return reply({isError:true,content:[{type:'text',text:'找不到作业：'+String(a.id||'')}]});
+        const t=tasks[idx];
+        if(a.title!==undefined){ const v=String(a.title||'').trim(); if(!v) return reply({isError:true,content:[{type:'text',text:'title 不能为空'}]}); t.title=v.slice(0,80); }
+        if(a.requirements!==undefined) t.requirements=mcpTaskReq(a.requirements);
+        if(a.deliverable!==undefined) t.deliverable=String(a.deliverable||'').slice(0,500);
+        if(a.acceptance!==undefined) t.acceptance=String(a.acceptance||'').slice(0,500);
+        if(a.scenario!==undefined) t.scenario=String(a.scenario||'').slice(0,500);
+        state.updatedAt=new Date().toISOString(); save();
+        return reply({content:[{type:'text',text:JSON.stringify({ok:true,count:tasks.length,task:mcpTaskView(t)})}]});
+      }
+      if(name==='homework.delete'){
+        const tasks=state.tasks||[]; const idx=mcpTaskIndex(tasks,a.id);
+        if(idx<0) return reply({isError:true,content:[{type:'text',text:'找不到作业：'+String(a.id||'')}]});
+        if(tasks.length<=1) return reply({isError:true,content:[{type:'text',text:'至少保留一道作业'}]});
+        tasks.splice(idx,1); mcpTaskSyncCount(); state.updatedAt=new Date().toISOString(); save();
+        return reply({content:[{type:'text',text:JSON.stringify({ok:true,count:tasks.length,tasks:tasks.map(mcpTaskView)})}]});
+      }
       if(name==='homework.download'){
         const task=String(a.task||'').trim(), student=String(a.student||'').trim();
         let count=0;
