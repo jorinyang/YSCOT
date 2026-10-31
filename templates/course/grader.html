@@ -38,6 +38,8 @@ body{animation:pageIn .32s ease both}
 @keyframes pageIn{from{opacity:0}to{opacity:1}}
 .embed body{padding:10px 12px 20px}
 .embed .head{display:none}
+  .taskcol{min-width:96px;max-width:170px;vertical-align:top}.taskname{font-size:10.5px;color:var(--muted);font-weight:400;line-height:1.35;margin-top:2px;white-space:normal}
+  .dims{font-size:11.5px;color:var(--muted);line-height:1.6;margin:4px 0 6px}
 </style><script src="/dialog.js"></script>
 <script>if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add("embed")</script>
 <link rel="stylesheet" href="/ui.css" />
@@ -69,7 +71,7 @@ body{animation:pageIn .32s ease both}
     <button class="btn ghost" id="hwToggle">作业提交：--</button>
     <button class="btn ghost" id="reviewToggle">作业评审：--</button>
   </div>
-  <div class="k" style="margin-top:14px">六关完成度（点行看详情）</div>
+  <div class="k" id="matrixTitle" style="margin-top:14px">作业完成度（点行看详情）</div>
   <div style="overflow:auto"><table id="tbl"></table></div>
 </div>
 
@@ -113,12 +115,29 @@ var TASKS=[
 var st=null, curKey='', hwOpen=false, reviewOpen=true;
 document.getElementById('downloadAll').onclick=function(){var a=document.createElement('a');a.href=API+'/api/admin/homework/zip';a.download='';document.body.appendChild(a);a.click();a.remove();};
 var ALL_TASKS=TASKS.slice(); var HWCOUNT=6;
-fetch(API+'/api/admin/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
-  var rb=(d&&d.rubrics)||{};
-  TASKS.forEach(function(t){ if(rb[t.id]&&rb[t.id].length){ t.crit=rb[t.id].map(function(x){return [x.t,x.pts,x.desc||'']}); } });
-}).catch(function(){});
+function buildTasks(d){
+  d=d||{}; var src=(d.tasks||[]).filter(Boolean), rb=d.rubrics||{};
+  var out;
+  if(src.length){
+    out=src.map(function(t,i){
+      var pts=Number(t.pts)||20;
+      var req=(t.requirements||[]).map(String).filter(Boolean);
+      var texts=req.length?req.slice(0,6):[String(t.acceptance||t.deliverable||'按场景完成交付物')];
+      var per=Math.max(1,Math.round(pts/texts.length));
+      var crit=texts.map(function(x,j){return [x,(j===texts.length-1?Math.max(1,pts-per*(texts.length-1)):per),'']});
+      return {id:String(t.id||('HW'+(i+1))),name:String(t.title||('作业 '+(i+1))),pts:pts,product:pts,breakdown:0,auto:[],manual:crit.map(function(c){return {t:c[0],pts:c[1]}}),crit:crit,scenario:t.scenario||'',requirements:req,deliverable:t.deliverable||'',acceptance:t.acceptance||''};
+    });
+    var known={}; out.forEach(function(t){known[t.id]=true});
+    (d.submissions||[]).forEach(function(s){ if(s.task&&!known[s.task]){ known[s.task]=true; out.push({id:s.task,name:'历史作业 '+s.task,pts:20,product:20,breakdown:0,auto:[],manual:[],crit:[['历史提交',20,'']]}); } });
+  }else{
+    out=ALL_TASKS.slice(0,Math.max(1,Math.min(6,Number(d.hwCount)||6)));
+  }
+  out.forEach(function(t){ if(rb[t.id]&&rb[t.id].length){ t.crit=rb[t.id].map(function(x){return [x.t,x.pts,x.desc||'']}); t.manual=t.crit.map(function(c){return {t:c[0],pts:Number(c[1])||0}}); } });
+  return out;
+}
 
 function $(id){return document.getElementById(id)}
+function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmt(n){return Math.round(n*10)/10}
 function autoScore(t,text){
   text=text||''; var s=0;
@@ -136,8 +155,9 @@ function totalOf(t,s){
   return {auto:a,break:b.score,manual:m,total:Math.min(t.pts,fmt(a+b.score+m)),breakN:b.n};
 }
 function taskOf(id){return TASKS.filter(function(t){return t.id===id})[0]}
-function subsOf(key){return (st.submissions||[]).filter(function(x){return x.key===key})}
-function subOf(key,task){return (st.submissions||[]).filter(function(x){return x.key===key&&x.task===task})[0]}
+function sameStudent(x,key){return x.studentKey===key||x.key===key||String(x.key||'').indexOf(key+'||')===0}
+function subsOf(key){return (st.submissions||[]).filter(function(x){return sameStudent(x,key)})}
+function subOf(key,task){return (st.submissions||[]).filter(function(x){return sameStudent(x,key)&&x.task===task})[0]}
 
 async function api(p,opt){ var r=await fetch(API+p,opt||{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
 async function post(p,b){ await fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}) }
@@ -146,7 +166,7 @@ async function refresh(){
   try{
     st=await api('/api/admin/state');
     $('svc').textContent='已连接';$('svc').className='pill on';
-    HWCOUNT=Math.max(1,Math.min(6,Number(st.hwCount)||6)); TASKS=ALL_TASKS.slice(0,HWCOUNT);
+    TASKS=buildTasks(st); HWCOUNT=TASKS.length;
     hwOpen=!!(st.config&&st.config.hwOpen); reviewOpen=st.reviewEnabled!==false; syncHw(); syncReview(); renderMatrix(); renderSubs(); renderCrit();
   }catch(e){ $('svc').textContent='未连接';$('svc').className='pill'; }
 }
@@ -154,8 +174,9 @@ function syncHw(){var b=$('hwToggle');b.textContent='作业提交：'+(hwOpen?'�
 function syncReview(){var b=$('reviewToggle');if(b){b.textContent='作业评审：'+(reviewOpen?'已开启':'已关闭');b.style.borderColor=reviewOpen?'rgba(99,183,154,.5)':''}if($('aiRescore'))$('aiRescore').style.display=reviewOpen?'':'none';if(!reviewOpen&&$('detailCard')&&$('detailCard').style.display!=='none'&&curKey)openSubmission(curKey);}
 
 function renderMatrix(){
+  var mt=document.getElementById('matrixTitle'); if(mt)mt.textContent='作业完成度（'+TASKS.length+' 项 · 点行看详情）';
   var students=(st.students||[]).slice().sort(function(a,b){var ga=(a.group||'Z'),gb=(b.group||'Z');return ga===gb?(a.name>b.name?1:-1):(ga>gb?1:-1)});
-  var html='<thead><tr><th>姓名</th><th>组</th>'+TASKS.map(function(t){return '<th>'+t.id+'</th>'}).join('')+'<th>总分</th><th>操作</th></tr></thead><tbody>';
+  var html='<thead><tr><th>姓名</th><th>组</th>'+TASKS.map(function(t){return '<th class="taskcol" title="'+escH(t.id+' '+t.name)+'">'+escH(t.id)+'<div class="taskname">'+escH(t.name)+'</div></th>'}).join('')+'<th>总分</th><th>操作</th></tr></thead><tbody>';
   students.forEach(function(sd){
     var key=sd.name+'|'+sd.tail; var tot=0;
     html+='<tr><td>'+sd.name+' <span class="muted">'+sd.tail+'</span></td><td>'+(sd.group||'-')+'</td>';
@@ -191,6 +212,7 @@ function openSubmission(key){
     var s=subOf(key,t.id); if(!s) return;
     var r=totalOf(t,s);
     body+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+t.id+' '+t.name+'</b><span class="pill">'+r.total+' / '+t.pts+' 分'+(r.override!=null?' · 人工定分':'')+'</span></div>';
+    if((t.requirements||[]).length) body+='<div class="dims">评价维度：'+t.requirements.map(escH).join(' / ')+'</div>';
     body+='<div class="rowflex" style="margin:6px 0"><button class="btn sm ai" data-ai="'+t.id+'" style="padding:3px 10px;font-size:12px" '+(reviewOpen?'':'disabled')+'>AI 评分</button><span class="muted small">'+(reviewOpen?'模型按评分标准打分，可再人工改':'评审已关闭，仅保留已上传作业')+'</span></div>';
     body+='<div class="small muted" style="margin:6px 0">自动 '+r.auto+' · 人工 '+r.manual+' · 拆解 '+r.break+'（三问达标 '+r.breakN+'/3）</div>';
     if((s.files||[]).length){

@@ -207,7 +207,7 @@ function save(){ clearTimeout(saveTimer); const room=ctxRoom(); try{ saveRoom(ro
 function groupsOn(){ return !(state.config&&state.config.groupsEnabled===false); }
 function reviewOn(){ return !(state.config&&state.config.reviewEnabled===false); }
 function hwCountOn(){ return Math.max(1,Math.min(6,Number(state.config&&state.config.hwCount)||6)); }
-function taskAllowed(t){ const m=/^T([1-6])$/.exec(String(t||'')); return !!m && Number(m[1])<=hwCountOn(); }
+function taskAllowed(t){ const list=state.tasks||[]; if(list.length) return list.some(function(x){return String(x.id)===String(t||'')}); const m=/^T([1-6])$/.exec(String(t||'')); return !!m && Number(m[1])<=hwCountOn(); }
 function keyOf(name,tail){ return String(name||'').trim()+'|'+String(tail||'').trim(); }
 function groupCounts(){ const c={}; Object.keys(state.groups).forEach(g=>c[g]=0); Object.values(state.students).forEach(s=>{ if(s.group&&c[s.group]!==undefined) c[s.group]++ }); return c; }
 function ensureStudent(name,tail){ const k=keyOf(name,tail); if(!state.students[k]){ state.students[k]={name:String(name).trim(),tail:String(tail).trim(),group:'',score:0,votes:0,buzzes:0,joinedAt:new Date().toISOString()}; save(); } return state.students[k]; }
@@ -289,7 +289,7 @@ function studentView(k){
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
-    quiz:(function(){var q=state.quiz||{};var p=q.paper;if(!p||!p.active)return {active:false};var a=(q.answers||{})[k];var qs=quizPaperFor(k);return {active:true,submitted:!!a,myScore:a?a.score:null,total:qs.reduce(function(x,y){return x+(y.score||0)},0),questions:qs.map(function(x){return {id:x.id,type:x.type,q:x.q,options:x.options||[],score:x.score}})};})(),
+    quiz:(function(){var q=state.quiz||{};var p=q.paper;var a=(q.answers||{})[k];var qs=quizPaperFor(k);var tt=qs.reduce(function(x,y){return x+(y.score||0)},0);if(!p||!p.active)return {active:false,submitted:!!a,myScore:a?a.score:null,total:tt};return {active:true,submitted:!!a,myScore:a?a.score:null,total:tt,questions:qs.map(function(x){return {id:x.id,type:x.type,q:x.q,options:x.options||[],score:x.score}})};})(),
     groupCounts: groupCounts(),
     groups: Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name})),
     submissions: s? Object.keys(state.submissions).filter(k2=>k2.indexOf(k+'||')===0).map(k2=>{const p=k2.split('||');return {task:p[1],at:state.submissions[k2].at,total:(state.submissions[k2].score||{}).total||0,files:(state.submissions[k2].files||[]).length}}):[]
@@ -908,7 +908,7 @@ function screenView(){
     activeCard:(cfg.activeCard||''),activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===cfg.activeCard})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null})()
   };
 }
-function send(res,code,obj,type='application/json; charset=utf-8'){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); res.writeHead(code,{'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, X-MCP-Token','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}); res.end(body); }
+function send(res,code,obj,type='application/json; charset=utf-8',extra){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); const _h={'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, X-MCP-Token','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}; if(extra&&typeof extra==='object')Object.assign(_h,extra); res.writeHead(code,_h); res.end(body); }
 function readRaw(req, limit){
   return new Promise((resolve,reject)=>{ const chunks=[]; let n=0; const max=limit||8*1024*1024;
     req.on('data',c=>{ n+=c.length; if(n>max){ reject(new Error('too large')); req.destroy(); return; } chunks.push(c); });
@@ -1427,6 +1427,23 @@ const server=http.createServer(async (req,res)=>{
           const quiz=state.quiz||{};
           const answers=Object.keys(quiz.answers||{}).map(k=>{const a=quiz.answers[k];return {key:k,score:a.score,total:a.total,at:a.at}});
           return send(res,200,{ok:true,room:ctxRoom(),generatedAt:new Date().toISOString(),students,groups:screenView().groups,poll:screenView().poll,quiz:{paper:screenView().quiz,answers},submissions:{count:subs.length,byTask,list:subs},timer:state.timer||null});
+        }
+        if(p==='/api/quiz-export.csv'){
+          const q=state.quiz||{}; const ans=q.answers||{}; const pz=q.paper||{};
+          const head=['姓名','尾号','小组','提交时间','得分','总分','得分率','选择题','判断题','填空题','简答题'];
+          const rows=[head.join(',')];
+          const byType={choice:'',judge:'',blank:'',short:''};
+          Object.keys(ans).forEach(function(k){
+            const a=ans[k]||{}; const st=state.students[k]||{};
+            const rate=a.total?Math.round(a.score/a.total*1000)/10:0;
+            const agg={choice:0,judge:0,blank:0,short:0};
+            (a.detail||[]).forEach(function(d){ if(agg[d.type]!==undefined) agg[d.type]+=(d.score||0); });
+            const cells=[st.name||k, st.tail||'', st.group||'', a.at||'', a.score||0, a.total||0, rate+'%',
+                         Math.round(agg.choice*10)/10, Math.round(agg.judge*10)/10, Math.round(agg.blank*10)/10, Math.round(agg.short*10)/10];
+            rows.push(cells.map(function(c){ const s=String(c==null?'':c); return /[",\n]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; }).join(','));
+          });
+          const csv='\ufeff'+rows.join('\r\n');
+          return send(res,200,csv,'text/csv; charset=utf-8','attachment; filename="quiz-result-'+ctxRoom()+'.csv"');
         }
         if(p==='/api/report.csv'){
           const lines=['姓名,尾号,小组,投票,抢答,作业数'];
