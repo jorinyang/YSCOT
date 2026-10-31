@@ -75,6 +75,9 @@ h1 span{display:block;font-size:13px;color:var(--amber-l);letter-spacing:.2em;ma
 .ws-files a{font-size:11.5px;color:#F0D9AC;border:1px solid rgba(233,180,92,.35);border-radius:8px;padding:5px 9px;text-decoration:none;background:rgba(217,138,43,.08)}
 body{animation:pageIn .32s ease both}
 @keyframes pageIn{from{opacity:0}to{opacity:1}}
+#hwToast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,16px);background:#123328;border:1px solid rgba(99,183,154,.55);color:#EAF3EC;border-radius:12px;padding:12px 18px;font-size:13.5px;line-height:1.5;box-shadow:0 12px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100;max-width:86vw;text-align:center}
+#hwToast.show{opacity:1;transform:translate(-50%,0)}
+#hwToast.fail{border-color:rgba(224,138,118,.6);background:#3A1D18;color:#F5DDD5}
 </style><link rel="stylesheet" href="/ui.css" />
 <link rel="stylesheet" href="/dialog.css" />
 </head><body>
@@ -147,6 +150,7 @@ body{animation:pageIn .32s ease both}
     </div>
 
     <p class="foot">课程当天 09:00–17:40 · 弈策AI研究院培训室</p>
+<div id="hwToast" role="status" aria-live="polite"></div>
   </section>
 </div>
 <script src="/dialog.js"></script>
@@ -158,6 +162,8 @@ var MAT='/materials/';
 var KEY='camp_live_v3';
 var me={name:'',tail:''};
 var stateData=null,pollChoice=-1,lastPollId='',pending=[];
+var hwToastTimer=null;
+function showHwToast(msg,bad){var t=document.getElementById('hwToast');if(!t)return;t.textContent=msg;t.className='show'+(bad?' fail':'');clearTimeout(hwToastTimer);hwToastTimer=setTimeout(function(){t.className=''},4200);}
 var QUIZPICK_KEY='camp_live_quizpick_'+ROOM;
 var quizPick=(function(){try{return JSON.parse(sessionStorage.getItem(QUIZPICK_KEY)||'{}')||{}}catch(e){return{}}})();
 function saveQuizPick(){try{sessionStorage.setItem(QUIZPICK_KEY,JSON.stringify(quizPick))}catch(e){}}
@@ -282,19 +288,21 @@ $('hwConfirm').addEventListener('click',async function(){
   var names=pending.map(function(x){return x.task+'：'+x.file.name}).join('\n');
   if(!confirm('确认提交以下 '+pending.length+' 个文件？\n\n'+names+'\n\n提交后讲师后台立即可见。'))return;
   var btn=$('hwConfirm');btn.disabled=true;btn.textContent='提交中…';
-  var fails=0;
+  var fails=0, okCount=0;
   var batch=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   for(var i=0;i<pending.length;i++){
     var x=pending[i];
     try{
       var r=await fetch(API+'/api/upload?name='+encodeURIComponent(me.name)+'&tail='+encodeURIComponent(me.tail)+'&task='+x.task+'&filename='+encodeURIComponent(x.file.name)+'&batch='+encodeURIComponent(batch),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:x.file});
       if(!r.ok)throw new Error('HTTP '+r.status);
+      okCount++;
     }catch(e){fails++;}
   }
   pending=[];
   btn.disabled=false;btn.innerHTML='确认提交（<span id="hwPendingN">0</span>）';
   await refresh();
-  if(fails)alert(fails+' 个文件上传失败，请重试');
+  if(fails)showHwToast('作业提交完成 '+okCount+' 个，失败 '+fails+' 个，请重试失败文件',true);
+  else showHwToast('作业提交完成：'+okCount+' 个文件，已同步给讲师');
 });
 function renderWs(){
   var _wsLimit=Math.max(1,Math.min(6,Number(stateData&&stateData.hwCount)||6));
