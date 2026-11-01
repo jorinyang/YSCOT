@@ -306,7 +306,7 @@ function studentView(k){
     roll:(function(){var r=state.roll||{};return {active:!!r.active,name:r.name||'',selected:!!(r.active&&r.key===k)};})(),
     card:(function(){ if(!(state.config&&state.config.workshopOpen)) return null; var c=(state.cards||[]).filter(function(x){return x.id===state.config.activeCard})[0]; return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null; })(),
     materialOpen:!!(state.config&&state.config.materialOpen),
-    materials:(function(){var out=[];try{var m=cachedRoomMeta(ctxRoom());out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(ctxRoom())+'&download=1'}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
+    materials:(function(){var out=[];try{var m=cachedRoomMeta(ctxRoom());out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(ctxRoom())+'&download=1&filename='+encodeURIComponent(f.name)}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
@@ -977,6 +977,30 @@ function screenView(){
     activeCard:(cfg.activeCard||''),activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===cfg.activeCard})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null})()
   };
 }
+function sendFileStream(req,res,filePath,displayName,contentType,attachment){
+  let stat; try{ stat=fs.statSync(filePath); }catch(e){ return send(res,404,'not found','text/plain'); }
+  const size=stat.size; const name=String(displayName||path.basename(filePath)||'file');
+  let start=0,end=size>0?size-1:0,status=200;
+  const range=String(req.headers.range||'');
+  if(range){
+    const m=/^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if(m){
+      if(!m[1]&&m[2]){ const n=Number(m[2]); start=Math.max(0,size-n); end=size-1; }
+      else{ start=Number(m[1]||0); if(m[2])end=Math.min(size-1,Number(m[2])); }
+      if(start<0||start>=size||start>end){ res.writeHead(416,{'Content-Range':'bytes */'+size,'Accept-Ranges':'bytes'}); return res.end(); }
+      status=206;
+    }
+  }
+  const len=size>0?(end-start+1):0;
+  const hdr={'Content-Type':contentType||'application/octet-stream','Content-Length':len,'Accept-Ranges':'bytes','Content-Disposition':(attachment?'attachment':'inline')+'; filename*=UTF-8\'\''+encodeURIComponent(name),'Cache-Control':'no-store'};
+  if(status===206)hdr['Content-Range']='bytes '+start+'-'+end+'/'+size;
+  if(/^text\/html/i.test(hdr['Content-Type'])&&!attachment)hdr['Content-Security-Policy']='sandbox allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock';
+  res.writeHead(status,hdr);
+  if(req.method==='HEAD'||len===0)return res.end();
+  const stream=fs.createReadStream(filePath,{start:start,end:end});
+  stream.on('error',function(){ try{res.destroy()}catch(e){} });
+  return stream.pipe(res);
+}
 function send(res,code,obj,type='application/json; charset=utf-8',extra){ const raw=Buffer.isBuffer(obj)||typeof obj==='string'?obj:JSON.stringify(obj); const body=Buffer.isBuffer(raw)?raw:Buffer.from(String(raw)); const _h={'Content-Type':type,'Content-Length':body.length,'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, X-MCP-Token','Access-Control-Allow-Methods':'GET,POST,OPTIONS'}; if(typeof extra==='string'&&extra)_h['Content-Disposition']=extra; else if(extra&&typeof extra==='object')Object.assign(_h,extra); res.writeHead(code,_h); res.end(body); }
 function readRaw(req, limit){
   return new Promise((resolve,reject)=>{ const chunks=[]; let n=0; const max=limit||8*1024*1024;
@@ -1205,11 +1229,8 @@ const server=http.createServer(async (req,res)=>{
     if(!fs.existsSync(f)) return send(res,404,'not found','text/plain');
     const ext=(name.split('.').pop()||'').toLowerCase();
     const ct=ext==='pdf'?'application/pdf':ext==='pptx'?'application/vnd.openxmlformats-officedocument.presentationml.presentation':ext==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':(ext==='html'||ext==='htm')?'text/html; charset=utf-8':'application/octet-stream';
-    const buf=fs.readFileSync(f); const dl=u.searchParams.get('download')==='1';
-    const hdr={'Content-Type':ct,'Content-Length':buf.length,'Content-Disposition':(dl?'attachment':'inline')+'; filename*=UTF-8\'\''+encodeURIComponent(name),'Cache-Control':'no-store'};
-    if(ext==='html'||ext==='htm') hdr['Content-Security-Policy']="sandbox allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock";
-    res.writeHead(200,hdr);
-    return res.end(buf);
+    const disp=String(u.searchParams.get('filename')||name); const dl=u.searchParams.get('download')==='1';
+    return sendFileStream(req,res,f,disp,ct,dl);
   }
   if(p==='/api/room/markdown' && req.method==='POST'){
     const b=await readBody(req); const text=String(b.text||'');
@@ -1528,7 +1549,9 @@ const server=http.createServer(async (req,res)=>{
         let sub=state.submissions[k+'||'+task]; if(rid){ ensureHistory(); const h=(state.history.submissions||[]).filter(function(x){return x.id===rid})[0]; if(h) sub=h; }
         if(!sub||!sub.files||!sub.files[idx]) return send(res,404,'not found','text/plain');
         const safeK2=String(k||sub.studentKey||'').replace(/[^a-zA-Z0-9_.\-\u4e00-\u9fa5]/g,'_'); const fp=path.join(DATA_DIR,'uploads',safeK2,sub.files[idx].path);
-        return fs.readFile(fp,function(e,b){ if(e)return send(res,404,'not found','text/plain'); const fn=String(sub.files[idx].name||'file.bin'); res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(fn)); return send(res,200,b,'application/octet-stream'); });
+        const fn=String(sub.files[idx].name||'file.bin'); const ext=(fn.split('.').pop()||'').toLowerCase();
+        const ct=ext==='pdf'?'application/pdf':ext==='md'?'text/markdown; charset=utf-8':ext==='json'?'application/json; charset=utf-8':ext==='txt'?'text/plain; charset=utf-8':ext==='html'||ext==='htm'?'text/html; charset=utf-8':'application/octet-stream';
+        return sendFileStream(req,res,fp,fn,ct,true);
       }
       if(req.method==='POST'){
         const b=(p==='/api/upload')?{}:await readBody(req);
