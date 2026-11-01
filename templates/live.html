@@ -339,7 +339,7 @@ function render(){
   if(mc){
     var mshow=!!(stateData.materialOpen&&stateData.materials&&stateData.materials.length);
     mc.classList.toggle('hidden',!mshow);
-    if(mshow){ $('matCount').textContent=stateData.materials.length+' 份'; $('matList').innerHTML=stateData.materials.map(function(f){var ext=/^https?:/i.test(f.url);return '<div style="padding:4px 0"><a href="'+f.url+'" '+(ext?'target="_blank" rel="noopener"':'download="'+escHtml(f.name)+'"')+'>'+escHtml(f.name)+'</a></div>'}).join(''); }
+    if(mshow){ $('matCount').textContent=stateData.materials.length+' 份'; $('matList').innerHTML=stateData.materials.map(function(f){var ext=/^https?:/i.test(f.url);var href=f.url;if(!ext)href+=(href.indexOf('?')>=0?'&':'?')+'download=1';return '<div style="padding:4px 0"><a href="'+href+'" '+(ext?'target="_blank" rel="noopener"':'download="'+escHtml(f.name)+'"')+'>'+escHtml(f.name)+'</a></div>'}).join(''); }
   }
   var qz=stateData.quiz||{active:false};
   var showQuiz=!!(qz.active||qz.submitted);
