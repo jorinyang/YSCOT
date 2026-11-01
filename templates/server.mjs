@@ -306,7 +306,7 @@ function studentView(k){
     roll:(function(){var r=state.roll||{};return {active:!!r.active,name:r.name||'',selected:!!(r.active&&r.key===k)};})(),
     card:(function(){ if(!(state.config&&state.config.workshopOpen)) return null; var c=(state.cards||[]).filter(function(x){return x.id===state.config.activeCard})[0]; return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null; })(),
     materialOpen:!!(state.config&&state.config.materialOpen),
-    materials:(function(){var out=[];try{var m=cachedRoomMeta(ctxRoom());out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(ctxRoom())}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
+    materials:(function(){var out=[];try{var m=cachedRoomMeta(ctxRoom());out=(m.files||[]).filter(function(f){return f.released!==false}).map(function(f){return {name:f.name,url:'/api/room/file?name='+encodeURIComponent(f.stored)+'&room='+encodeURIComponent(ctxRoom())+'&download=1'}})}catch(e){}; (state.materials||[]).forEach(function(x){out.push({name:x.name,url:x.url,type:x.type||''})}); return out})(),
     tasks:(state.tasks||[]).map(function(t){return {id:t.id,title:t.title,scenario:t.scenario,requirements:t.requirements||[],deliverable:t.deliverable||'',acceptance:t.acceptance||''}}),
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',won:!!(state.buzz&&state.buzz.winnerKey&&state.buzz.winnerKey===k),round:(state.buzz&&state.buzz.round)||0},
@@ -1205,10 +1205,11 @@ const server=http.createServer(async (req,res)=>{
     if(!fs.existsSync(f)) return send(res,404,'not found','text/plain');
     const ext=(name.split('.').pop()||'').toLowerCase();
     const ct=ext==='pdf'?'application/pdf':ext==='pptx'?'application/vnd.openxmlformats-officedocument.presentationml.presentation':ext==='docx'?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':(ext==='html'||ext==='htm')?'text/html; charset=utf-8':'application/octet-stream';
-    const hdr={'Content-Type':ct,'Content-Disposition':'inline','Cache-Control':'no-store'};
+    const buf=fs.readFileSync(f); const dl=u.searchParams.get('download')==='1';
+    const hdr={'Content-Type':ct,'Content-Length':buf.length,'Content-Disposition':(dl?'attachment':'inline')+'; filename*=UTF-8\'\''+encodeURIComponent(name),'Cache-Control':'no-store'};
     if(ext==='html'||ext==='htm') hdr['Content-Security-Policy']="sandbox allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock";
     res.writeHead(200,hdr);
-    return res.end(fs.readFileSync(f));
+    return res.end(buf);
   }
   if(p==='/api/room/markdown' && req.method==='POST'){
     const b=await readBody(req); const text=String(b.text||'');
@@ -1527,7 +1528,7 @@ const server=http.createServer(async (req,res)=>{
         let sub=state.submissions[k+'||'+task]; if(rid){ ensureHistory(); const h=(state.history.submissions||[]).filter(function(x){return x.id===rid})[0]; if(h) sub=h; }
         if(!sub||!sub.files||!sub.files[idx]) return send(res,404,'not found','text/plain');
         const safeK2=String(k||sub.studentKey||'').replace(/[^a-zA-Z0-9_.\-\u4e00-\u9fa5]/g,'_'); const fp=path.join(DATA_DIR,'uploads',safeK2,sub.files[idx].path);
-        return fs.readFile(fp,function(e,b){ return e?send(res,404,'not found','text/plain'):send(res,200,b,'application/octet-stream'); });
+        return fs.readFile(fp,function(e,b){ if(e)return send(res,404,'not found','text/plain'); const fn=String(sub.files[idx].name||'file.bin'); res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(fn)); return send(res,200,b,'application/octet-stream'); });
       }
       if(req.method==='POST'){
         const b=(p==='/api/upload')?{}:await readBody(req);
