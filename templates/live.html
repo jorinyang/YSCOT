@@ -175,6 +175,44 @@ var WS=[
  {t:'T5 项目协作',p:'15 分',inp:'项目信息、人员、资料',act:'建项目 / 拆任务 / 排期 / 归档',out:'项目工作台',ok:'责任到人、进度可视',files:[['T5 项目协作任务卡','t5-项目协作任务卡.md'],['T5 初始信息','t5-初始信息.md']]},
  {t:'T6 对外核对',p:'20 分',inp:'多方账目与资料',act:'交叉比对 / 差异定位',out:'对账差异报告',ok:'差异全找到、口径清楚',files:[['T6 结算规则与背景','t6-结算规则与背景.md'],['T6 执行方总账','t6-执行方总账.csv'],['T6 演出方','t6-演出方.csv'],['T6 场地方','t6-场地方.csv'],['T6 服务提供方','t6-服务提供方.csv'],['T6 渠道合作方','t6-渠道合作方.csv'],['T6 设施提供方','t6-设施提供方.csv']]}
 ];
+function isSafariDownload(){var ua=navigator.userAgent||'';return /Macintosh/.test(ua)&&/Safari/.test(ua)&&!/Chrome|Chromium|CriOS|Edg|OPR|Android/i.test(ua)}
+function sleepMs(ms){return new Promise(function(r){setTimeout(r,ms)})}
+async function safariRangeDownload(url,name){
+  var head=await fetch(url,{method:'HEAD',cache:'no-store'});
+  var size=Number(head.headers.get('Content-Length'))||0;
+  if(!head.ok||!size)throw new Error('无法读取文件大小');
+  var chunk=1024*1024,parts=[],pos=0;
+  while(pos<size){
+    var end=Math.min(size-1,pos+chunk-1),blob=null,lastErr='';
+    for(var attempt=0;attempt<3&&!blob;attempt++){
+      try{
+        var r=await fetch(url,{headers:{Range:'bytes='+pos+'-'+end},cache:'no-store'});
+        if(r.status!==206&&r.status!==200)throw new Error('HTTP '+r.status);
+        var b=await r.blob();
+        if(r.status===200&&b.size===size){parts=[b];pos=size;break}
+        if(b.size!==end-pos+1)throw new Error('分片长度不完整');
+        blob=b;
+      }catch(e){lastErr=e.message||'网络错误';await sleepMs(600)}
+    }
+    if(size&&pos>=size)break;
+    if(!blob)throw new Error(lastErr||'分片下载失败');
+    parts.push(blob);pos=end+1;
+    showHwToast('正在下载 '+name+' '+Math.round(pos/size*100)+'%');
+  }
+  var out=new Blob(parts,{type:'application/octet-stream'});
+  var a=document.createElement('a');var obj=URL.createObjectURL(out);
+  a.href=obj;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(obj);a.remove()},60000);
+  showHwToast('下载完成：'+name);
+}
+document.addEventListener('click',function(e){
+  var a=e.target&&e.target.closest?e.target.closest('a[download]'):null;
+  if(!a||!isSafariDownload())return;
+  e.preventDefault();
+  safariRangeDownload(a.href,a.getAttribute('download')||'文件').catch(function(err){
+    showHwToast('下载失败：'+err.message,true);
+  });
+});
 function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 var HWS=[
  {id:'T1',no:1,title:'1 号作业：方案文档',hint:'方案 md / json / html 文件',accept:'.md,.json,.html,.htm'},
