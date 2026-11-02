@@ -181,7 +181,7 @@ async function safariRangeDownload(url,name){
   var head=await fetch(url,{method:'HEAD',cache:'no-store'});
   var size=Number(head.headers.get('Content-Length'))||0;
   if(!head.ok||!size)throw new Error('无法读取文件大小');
-  var chunk=1024*1024,parts=[],pos=0;
+  var chunk=512*1024,parts=[],pos=0;
   while(pos<size){
     var end=Math.min(size-1,pos+chunk-1),blob=null,lastErr='';
     for(var attempt=0;attempt<3&&!blob;attempt++){
