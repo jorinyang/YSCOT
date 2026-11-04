@@ -205,6 +205,22 @@ try{
 let saveTimer=null;
 function save(){ clearTimeout(saveTimer); const room=ctxRoom(); try{ saveRoom(room, state); }catch(e){ console.error('save fail',e.message); } }
 function ensureHistory(){ state.history=state.history||{}; ['polls','submissions','quizzes'].forEach(function(k){ if(!Array.isArray(state.history[k])) state.history[k]=[]; }); return state.history; }
+function historyArchivePath(kind,id){
+  const safe=String(id||'').replace(/[^a-zA-Z0-9_.-]/g,'_');
+  const d=path.join(roomDir(ctxRoom()),'history',kind);
+  fs.mkdirSync(d,{recursive:true});
+  return path.join(d,safe+'.json');
+}
+function writeHistoryArchive(kind,item){
+  const f=historyArchivePath(kind,item.id||historyId(kind));
+  fs.writeFileSync(f,JSON.stringify(item));
+  return f;
+}
+function quizHistorySummary(x){
+  const ans={};
+  Object.keys(x.answers||{}).forEach(function(k){const a=x.answers[k]||{};ans[k]={score:a.score||0,total:a.total||0};});
+  return {id:x.id,at:x.at,reason:x.reason,publishedAt:x.publishedAt,closedAt:x.closedAt,mode:x.mode,counts:x.counts||{},scores:x.scores||{},answered:x.answered||0,questionCount:x.questionCount||(x.questions||[]).length,answers:ans,archived:true};
+}
 function historyId(prefix){ return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7); }
 function pollTotal(){ return state.poll&&state.poll.options?Object.keys(state.poll.votes||{}).length:0; }
 function archivePoll(reason){
@@ -217,7 +233,11 @@ function archiveQuiz(reason){
   const q=state.quiz||{}; const paper=q.paper; if(!paper) return null;
   const h=ensureHistory(); const answers=q.answers||{};
   const item={id:historyId('quiz'),at:new Date().toISOString(),reason:reason||'replaced',publishedAt:paper.at||'',closedAt:paper.active?'':new Date().toISOString(),mode:paper.mode||q.config&&q.config.mode||'seq',counts:paper.counts||{},scores:paper.scores||{},questions:(paper.questions||[]).map(function(x){return Object.assign({},x)}),papers:Object.assign({},q.papers||{}),answers:Object.assign({},answers),answered:Object.keys(answers).length};
-  h.quizzes.push(item); return item;
+  let archived=false;
+  try{ writeHistoryArchive('quizzes',item); archived=true; }catch(e){ console.error('history archive fail',e.message); }
+  h.quizzes.push(archived?quizHistorySummary(item):item);
+  if(h.quizzes.length>500) h.quizzes=h.quizzes.slice(-500);
+  return item;
 }
 function archiveSubmission(key,sub,reason){
   if(!sub) return null;
@@ -230,7 +250,7 @@ function historyView(){
   const subs=(state.history.submissions||[]).map(function(x){return {id:x.id,at:x.at,archivedAt:x.archivedAt,reason:x.reason,name:x.name,tail:x.tail,task:x.task,key:x.key,studentKey:x.studentKey,files:(x.files||[]).map(function(f){return {name:f.name,size:f.size,path:f.path,at:f.at}}),score:x.score||null,batch:x.batch||'',submittedAt:x.submittedAt||''};});
   const quizzes=(state.history.quizzes||[]).map(function(x){
     const ans={}; Object.keys(x.answers||{}).forEach(function(k){const a=x.answers[k]||{};ans[k]={score:a.score||0,total:a.total||0};});
-    return {id:x.id,at:x.at,reason:x.reason,publishedAt:x.publishedAt,closedAt:x.closedAt,mode:x.mode,counts:x.counts||{},scores:x.scores||{},answered:x.answered||0,questionCount:(x.questions||[]).length,answers:ans};
+    return {id:x.id,at:x.at,reason:x.reason,publishedAt:x.publishedAt,closedAt:x.closedAt,mode:x.mode,counts:x.counts||{},scores:x.scores||{},answered:x.answered||0,questionCount:x.questionCount||(x.questions||[]).length,answers:ans,archived:!!x.archived};
   });
   return {polls:state.history.polls||[],submissions:subs,quizzes:quizzes};
 }
