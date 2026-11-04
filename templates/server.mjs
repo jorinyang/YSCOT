@@ -344,7 +344,7 @@ function adminView(){
   const qz=state.quiz||{bank:{},config:{},paper:null,answers:{}};
   const qbank={choice:(qz.bank.choice||[]).length,judge:(qz.bank.judge||[]).length,blank:(qz.bank.blank||[]).length,short:(qz.bank.short||[]).length};
   const qans=Object.keys(qz.answers||{}).map(function(k){return qz.answers[k]});
-  const quizInfo={bank:qbank,config:qz.config||{},paper:qz.paper?{active:!!qz.paper.active,at:qz.paper.at,count:qz.paper.questions.length,points:qz.paper.questions.reduce(function(a,b){return a+(b.score||0)},0)}:null,answered:qans.length,avg:qans.length?Math.round(qans.reduce(function(a,b){return a+(b.score||0)},0)/qans.length*10)/10:0};
+  const quizInfo={bank:qbank,config:qz.config||{},paper:qz.paper?{active:!!qz.paper.active,at:qz.paper.at,count:qz.paper.questions.length,points:qz.paper.questions.reduce(function(a,b){return a+(b.score||0)},0)}:null,answered:qans.length,avg:qans.length?Math.round(qans.reduce(function(a,b){return a+(b.score||0)},0)/qans.length*10)/10:0,groups:quizGroupStats()};
   const results={};
   if(state.poll.options&&state.poll.options.length){ state.poll.options.forEach((o,i)=>{results[i]=0}); Object.values(state.poll.votes||{}).forEach(v=>{ if(results[v]!==undefined) results[v]++ }); }
   const subs=Object.keys(state.submissions).map(k=>{ const p=k.split('||'); const st=state.students[p[0]]||{}; const sub=state.submissions[k]; return {key:k,studentKey:p[0],name:st.name||p[0],tail:st.tail||'',task:p[1],text:sub.text||'',fileName:sub.fileName||'',q1:sub.q1||'',q2:sub.q2||'',q3:sub.q3||'',files:sub.files||[],at:sub.at,manual:sub.manual||[],score:sub.score||null}; });
@@ -937,6 +937,26 @@ function listPackages(){
     return {id:d,title:m.title||d,createdAt:m.createdAt||'',url:'/pkg/'+d+'/index.html'};
   }).sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt))});
 }
+function quizGroupStats(){
+  const ans=(state.quiz&&state.quiz.answers)||{};
+  const groups={};
+  const ensure=function(id,name){ if(!groups[id])groups[id]={id:id,name:name||id||'未分组',members:0,answered:0,total:0,avg:0,avgAll:0,completion:0}; return groups[id]; };
+  Object.keys(state.groups||{}).forEach(function(g){ensure(g,state.groups[g].name||g)});
+  Object.keys(state.students||{}).forEach(function(k){
+    const st=state.students[k]||{}; const gid=st.group||''; const r=ensure(gid,gid||'未分组');
+    r.members++;
+    const a=ans[k];
+    if(a){r.answered++;r.total+=Number(a.score)||0;}
+  });
+  Object.keys(groups).forEach(function(gid){
+    const r=groups[gid];
+    r.total=Math.round(r.total*10)/10;
+    r.avg=r.answered?Math.round(r.total/r.answered*10)/10:0;
+    r.avgAll=r.members?Math.round(r.total/r.members*10)/10:0;
+    r.completion=r.members?Math.round(r.answered/r.members*100):0;
+  });
+  return Object.keys(groups).map(function(k){return groups[k]}).filter(function(r){return r.members>0}).sort(function(a,b){if(!a.id)return 1;if(!b.id)return -1;return a.id.localeCompare(b.id)});
+}
 function screenView(){
   const poll=state.poll||{};
   const results={};
@@ -972,7 +992,7 @@ function screenView(){
     timer:{running:!!(state.timer&&state.timer.running),endAt:(state.timer&&state.timer.endAt)||0,left:(state.timer&&state.timer.running)?Math.max(0,state.timer.endAt-Date.now()):0},
     poll:{active:!!poll.active,question:poll.question||'',options:poll.options||[],results,count:Object.keys(poll.votes||{}).length},
     buzz:{enabled:!!(state.buzz&&state.buzz.enabled),running:!!(state.buzz&&state.buzz.running),winner:(state.buzz&&state.buzz.winner)||'',winnerKey:(state.buzz&&state.buzz.winnerKey)||'',round:(state.buzz&&state.buzz.round)||0},
-    quiz:paper?{active:!!paper.active,count:paper.questions.length,points:paper.questions.reduce(function(a,b){return a+(b.score||0)},0),answered:Object.keys(quiz.answers||{}).length,avg:_quizVals.length?Math.round(_quizVals.reduce(function(a,b){return a+(b.score||0)},0)/_quizVals.length*10)/10:0,top:_quizTop}:null,
+    quiz:paper?{active:!!paper.active,count:paper.questions.length,points:paper.questions.reduce(function(a,b){return a+(b.score||0)},0),answered:Object.keys(quiz.answers||{}).length,avg:_quizVals.length?Math.round(_quizVals.reduce(function(a,b){return a+(b.score||0)},0)/_quizVals.length*10)/10:0,top:_quizTop,groups:quizGroupStats()}:null,
     homework:{count:_subs.length,total:Math.round(_subs.reduce(function(a,x){return a+x.total},0)*10)/10,byTask:Object.keys(_byTask).map(function(t){return _byTask[t]})},
     activeCard:(cfg.activeCard||''),activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===cfg.activeCard})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null})()
   };

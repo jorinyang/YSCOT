@@ -185,6 +185,8 @@ body{animation:pageIn .32s ease both}
       <button class="btn ghost" id="quizClear">清空本次结果</button>
       <span class="muted small" id="quizStat">未发布</span>
     </div>
+    <div class="k" style="margin-top:14px">按小组答题平均分</div>
+    <div id="quizGroups" class="small" style="overflow:auto"></div>
   </div>
 
   </div><div id="pane-history" class="hidden">
@@ -295,6 +297,8 @@ function render(){
   var qz=state.quiz||{bank:{},config:{},paper:null,answered:0,avg:0};
   document.getElementById('quizBank').textContent='题库：'+(qz.bank.choice||0)+' / '+(qz.bank.judge||0)+' / '+(qz.bank.blank||0)+' / '+(qz.bank.short||0);
   document.getElementById('quizStat').textContent=qz.paper&&qz.paper.active?('进行中 · '+qz.paper.count+' 题 / '+qz.paper.points+' 分 · 已答 '+qz.answered+' 人 · 均分 '+qz.avg):(qz.paper?('已结束 · 参与 '+qz.answered+' 人 · 均分 '+qz.avg):'未发布');
+  var qg=qz.groups||[]; var qgEl=document.getElementById('quizGroups');
+  if(qgEl){ qgEl.innerHTML=qg.length?('<table><tr><th>小组</th><th class="num">人数</th><th class="num">已答</th><th class="num">参与率</th><th class="num">已答均分</th><th class="num">组内均分</th></tr>'+qg.map(function(g){return '<tr><td>'+escHtml(g.name||g.id||'未分组')+'</td><td class="num">'+g.members+'</td><td class="num">'+g.answered+'</td><td class="num">'+g.completion+'%</td><td class="num"><b>'+g.avg+'</b></td><td class="num">'+g.avgAll+'</td></tr>'}).join('')+'</table>'):'<span class="muted">还没有分组数据</span>'; }
   var qcfg=qz.config||{};
   /* 题量/分值是讲师草稿，不能被 4 秒轮询覆盖；发布后才同步（峰林版同类修复） */
   if(!quizFormInit||!quizFormDirty){
