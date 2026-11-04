@@ -237,7 +237,7 @@ async function api(p,opt){
   return await r.json();
 }
 async function post(p,body){return api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
-var state=null,editingKey=null,quizFormInit=false,quizFormDirty=false,matSelected={};
+var state=null,editingKey=null,quizFormInit=false,quizFormDirty=false,matSelected={},historyData=null;
 var _rm=(document.cookie.match(/(?:^|;\s*)gtsc_room=([A-Z0-9]{4})/)||[])[1];
 var ROOM=(new URLSearchParams(location.search).get('room')||_rm||'ROOM0').toUpperCase();
 (function(){var f=window.fetch.bind(window);window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0&&u.indexOf('room=')<0)u+=(u.indexOf('?')>=0?'&':'?')+'room='+encodeURIComponent(ROOM);return f(u,o)}})();
@@ -336,7 +336,6 @@ function render(){
   sb+='</table>';
   document.getElementById('studentsBox').innerHTML=sb;
   bind();
-  renderHistory();
 }
 function bind(){
   [].slice.call(document.querySelectorAll('[data-perf]')).forEach(function(b){b.addEventListener('click',async function(){
@@ -483,7 +482,7 @@ function bind(){
 }
 function renderHistory(){
   var box=document.getElementById('historyBox'); if(!box)return;
-  var h=state.history||{polls:[],submissions:[],quizzes:[]}; var out='';
+  var h=historyData; if(!h){ box.innerHTML='<div class="muted small">正在加载历史记录…</div>'; return; } var out='';
   out+='<div class="k">投票记录</div>';
   if(!h.polls||!h.polls.length){ out+='<div class="muted small" style="margin-bottom:14px">暂无已归档投票</div>'; }
   else { out+=h.polls.slice().reverse().map(function(p){
@@ -502,10 +501,11 @@ function renderHistory(){
   else { h.quizzes.slice().reverse().forEach(function(q){
     var ans=q.answers||{}; var keys=Object.keys(ans); var avg=keys.length?Math.round(keys.reduce(function(a,k){return a+((ans[k]||{}).score||0)},0)/keys.length*10)/10:0;
     var rows=keys.slice(0,30).map(function(k){var st=(state.students||[]).filter(function(x){return x.key===k})[0]||{};return '<div class="small">'+escHtml(st.name||k)+'：'+((ans[k]||{}).score||0)+' / '+((ans[k]||{}).total||0)+'</div>'}).join('');
-    out+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+escHtml(q.publishedAt||q.at||'')+' · '+escHtml(q.mode||'')+'</b><span class="pill">已答 '+q.answered+' · 均分 '+avg+'</span></div><div class="muted small" style="margin:6px 0">'+(q.questions||[]).length+' 题 · 归档 '+escHtml(q.at||'')+'</div><details><summary class="muted small" style="cursor:pointer">查看学员得分</summary>'+rows+(keys.length>30?'<div class="muted small">仅显示前 30 人</div>':'')+'</details></div>';
+    out+='<div class="card" style="background:rgba(255,255,255,.03);margin-bottom:10px"><div class="rowflex" style="justify-content:space-between"><b>'+escHtml(q.publishedAt||q.at||'')+' · '+escHtml(q.mode||'')+'</b><span class="pill">已答 '+q.answered+' · 均分 '+avg+'</span></div><div class="muted small" style="margin:6px 0">'+(q.questionCount||0)+' 题 · 归档 '+escHtml(q.at||'')+'</div><details><summary class="muted small" style="cursor:pointer">查看学员得分</summary>'+rows+(keys.length>30?'<div class="muted small">仅显示前 30 人</div>':'')+'</details></div>';
   }); }
   box.innerHTML=out;
 }
+async function loadHistory(){ try{ historyData=await api('/api/admin/history'); renderHistory(); }catch(e){ var box=document.getElementById('historyBox'); if(box)box.innerHTML='<div class="muted small">历史记录加载失败：'+escHtml(e.message||'网络错误')+'</div>'; } }
 async function refresh(){ try{ state=await api('/api/admin/state'); render(); }catch(e){ document.getElementById('svc').textContent='未连接（先启动讲师机服务）'; document.getElementById('svc').className='pill'; } }
 document.getElementById('resetGroups').addEventListener('click',async function(){ if(!confirm('清空所有人的分组？学员需要重新抽签。'))return; await post('/api/admin/reset',{scope:'groups'}); refresh(); });
 
@@ -521,6 +521,7 @@ refresh();setInterval(refresh,2500);
     var pm=document.getElementById('pane-model'); if(pm)pm.classList.toggle('hidden',t!=='model');
     tabs.forEach(function(b){b.classList.toggle('on',b.getAttribute('data-tab')===t)});
     if(t==='hw'){var f=document.getElementById('hwFrame');if(f&&!f.getAttribute('src'))f.src=local?'grader?embed=1':'grader.html?embed=1'}
+    if(t==='history')loadHistory();
     try{history.replaceState(null,'','#'+t)}catch(e){}
   }
   var hwPre=document.getElementById('hwFrame'); if(hwPre&&!hwPre.getAttribute('src'))hwPre.src=local?'grader?embed=1':'grader.html?embed=1';

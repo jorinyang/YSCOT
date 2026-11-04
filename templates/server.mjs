@@ -225,6 +225,15 @@ function archiveSubmission(key,sub,reason){
   const item={id:historyId('sub'),at:new Date().toISOString(),archivedAt:new Date().toISOString(),reason:reason||'replaced',key:key,studentKey:sk,task:tk,name:st.name||sk.split('|')[0]||'',tail:st.tail||'',text:sub.text||'',files:(sub.files||[]).map(function(f){return Object.assign({},f)}),score:sub.score||null,manual:(sub.manual||[]).slice(),batch:sub.batch||'',submittedAt:sub.at||''};
   h.submissions.push(item); return item;
 }
+function historyView(){
+  ensureHistory();
+  const subs=(state.history.submissions||[]).map(function(x){return {id:x.id,at:x.at,archivedAt:x.archivedAt,reason:x.reason,name:x.name,tail:x.tail,task:x.task,key:x.key,studentKey:x.studentKey,files:(x.files||[]).map(function(f){return {name:f.name,size:f.size,path:f.path,at:f.at}}),score:x.score||null,batch:x.batch||'',submittedAt:x.submittedAt||''};});
+  const quizzes=(state.history.quizzes||[]).map(function(x){
+    const ans={}; Object.keys(x.answers||{}).forEach(function(k){const a=x.answers[k]||{};ans[k]={score:a.score||0,total:a.total||0};});
+    return {id:x.id,at:x.at,reason:x.reason,publishedAt:x.publishedAt,closedAt:x.closedAt,mode:x.mode,counts:x.counts||{},scores:x.scores||{},answered:x.answered||0,questionCount:(x.questions||[]).length,answers:ans};
+  });
+  return {polls:state.history.polls||[],submissions:subs,quizzes:quizzes};
+}
 function groupsOn(){ return !(state.config&&state.config.groupsEnabled===false); }
 function reviewOn(){ return !(state.config&&state.config.reviewEnabled===false); }
 function hwCountOn(){ return Math.max(1,Math.min(6,Number(state.config&&state.config.hwCount)||6)); }
@@ -349,7 +358,7 @@ function adminView(){
   if(state.poll.options&&state.poll.options.length){ state.poll.options.forEach((o,i)=>{results[i]=0}); Object.values(state.poll.votes||{}).forEach(v=>{ if(results[v]!==undefined) results[v]++ }); }
   const subs=Object.keys(state.submissions).map(k=>{ const p=k.split('||'); const st=state.students[p[0]]||{}; const sub=state.submissions[k]; return {key:k,studentKey:p[0],name:st.name||p[0],tail:st.tail||'',task:p[1],text:sub.text||'',fileName:sub.fileName||'',q1:sub.q1||'',q2:sub.q2||'',q3:sub.q3||'',files:sub.files||[],at:sub.at,manual:sub.manual||[],score:sub.score||null}; });
   const _mc=modelCfg();
-  return {ok:true,timer:state.timer||null,workshopOpen:!!(state.config&&state.config.workshopOpen),quiz:quizInfo,model:{baseUrl:_mc.base,model:_mc.model,hasKey:!!_mc.key},config:state.config||{},groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),votePresets:state.votePresets||[],cards:state.cards||[],materials:state.materials||[],rubrics:state.rubrics||{},activeCard:(state.config&&state.config.activeCard)||'',activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===(state.config&&state.config.activeCard)})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null;})(),tasks:state.tasks||[],hwOpen:!!(state.config&&state.config.hwOpen),buzz:state.buzz||{enabled:false,running:false,winner:''},students:Object.keys(state.students).map(function(k){const st=Object.assign({key:k},state.students[k]);st.hwScore=Object.keys(state.submissions||{}).filter(function(sk){return sk.indexOf(k+'||')===0}).reduce(function(a,sk){return a+(((state.submissions[sk]||{}).score||{}).total||0)},0);st.quizScore=(((state.quiz&&state.quiz.answers&&state.quiz.answers[k])||{}).score)||0;st.individualScore=Math.round((st.hwScore+st.quizScore)*10)/10;return st}),groups:Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name,perf:state.groups[g].perf||0,count:counts[g]})),counts,roll:state.roll||{active:false},poll:{active:state.poll.active,question:state.poll.question,options:state.poll.options,votes:state.poll.votes,results,startedAt:state.poll.startedAt},submissions:subs,history:(function(){ensureHistory();return {polls:state.history.polls,submissions:state.history.submissions,quizzes:state.history.quizzes};})(),updatedAt:state.updatedAt};
+  return {ok:true,timer:state.timer||null,workshopOpen:!!(state.config&&state.config.workshopOpen),quiz:quizInfo,model:{baseUrl:_mc.base,model:_mc.model,hasKey:!!_mc.key},config:state.config||{},groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),votePresets:state.votePresets||[],cards:state.cards||[],materials:state.materials||[],rubrics:state.rubrics||{},activeCard:(state.config&&state.config.activeCard)||'',activeCardData:(function(){var c=(state.cards||[]).filter(function(x){return x.id===(state.config&&state.config.activeCard)})[0];return c?{theme:c.theme,type:c.type,content:c.content,attrs:c.attrs}:null;})(),tasks:state.tasks||[],hwOpen:!!(state.config&&state.config.hwOpen),buzz:state.buzz||{enabled:false,running:false,winner:''},students:Object.keys(state.students).map(function(k){const st=Object.assign({key:k},state.students[k]);st.hwScore=Object.keys(state.submissions||{}).filter(function(sk){return sk.indexOf(k+'||')===0}).reduce(function(a,sk){return a+(((state.submissions[sk]||{}).score||{}).total||0)},0);st.quizScore=(((state.quiz&&state.quiz.answers&&state.quiz.answers[k])||{}).score)||0;st.individualScore=Math.round((st.hwScore+st.quizScore)*10)/10;return st}),groups:Object.keys(state.groups).map(g=>({id:g,name:state.groups[g].name,perf:state.groups[g].perf||0,count:counts[g]})),counts,roll:state.roll||{active:false},poll:{active:state.poll.active,question:state.poll.question,options:state.poll.options,votes:state.poll.votes,results,startedAt:state.poll.startedAt},submissions:subs,updatedAt:state.updatedAt};
 }
 /* 【JSON 解读模块·临时】解析考试结果 JSON，提取评分（总分/等级/姓名/提示次数/各题得分）。
    通用字段名匹配（中/英），兼容不同 JSON 结构；解析不出的字段留 null，raw 保留原始 JSON。
@@ -1558,7 +1567,7 @@ const server=http.createServer(async (req,res)=>{
           return send(res,200,csv,'text/csv; charset=utf-8','attachment; filename="quiz-result-'+ctxRoom()+'.csv"');
         }
         if(p==='/api/admin/tasks' && req.method==='GET') return send(res,200,{ok:true,tasks:state.tasks||[]});
-        if(p==='/api/admin/history' && req.method==='GET'){ ensureHistory(); return send(res,200,{ok:true,polls:state.history.polls,submissions:state.history.submissions,quizzes:state.history.quizzes}); }
+        if(p==='/api/admin/history' && req.method==='GET'){ const h=historyView(); return send(res,200,Object.assign({ok:true},h)); }
         if(p==='/api/report.csv'){
           const lines=['姓名,尾号,小组,投票,抢答,作业数'];
           Object.keys(state.students).forEach(function(k){const st=state.students[k];const subs=Object.keys(state.submissions).filter(x=>x.indexOf(k+'||')===0).length;lines.push([st.name,st.tail,st.group||'',st.votes||0,st.buzzes||0,subs].join(','))});
