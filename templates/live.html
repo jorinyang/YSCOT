@@ -101,7 +101,7 @@ body{animation:pageIn .32s ease both}
     <div class="card" id="groupCard">
       <div class="k" id="groupTitle">我的小组</div>
       <div id="groupNone">
-        <p class="small" style="margin-bottom:10px">三人一组，抽到的字母就是你的组，全天不变。</p>
+        <p class="small" id="groupRule" style="margin-bottom:10px">按课程设置人数分组，抽到的字母就是你的组，全天不变。</p>
         <button class="btn" id="drawBtn">抽签</button>
       </div>
       <div id="groupGot" class="hidden">
@@ -358,6 +358,8 @@ function render(){
   var m=stateData.me;
   $('mName').textContent=m.name;$('mTail').textContent='尾号 '+m.tail;
   var groupsOn=stateData.groupsEnabled!==false;
+  var _groupMax=Math.max(1,Math.min(10,Number(stateData&&stateData.groupMax)||3));
+  if($('groupRule'))$('groupRule').textContent=_groupMax+'人一组，抽到的字母就是你的组，全天不变。';
   if($('gScore'))$('gScore').textContent=Number(groupsOn?(m.groupScore||m.score||0):(m.individualScore||0));
   if($('gScoreLabel'))$('gScoreLabel').textContent=groupsOn?'小组积分':'个人积分';
   var drawBtn=$('drawBtn'); if(drawBtn)drawBtn.style.display=groupsOn?'':'none';
@@ -368,7 +370,7 @@ function render(){
   }else if(m.group){
     $('groupNone').classList.add('hidden');$('groupGot').classList.remove('hidden');
     $('gLetter').textContent=m.group;
-    $('gText').innerHTML='你是 <b>'+m.group+' 组</b><br />三人一组，成果一起算分';
+    $('gText').innerHTML='你是 <b>'+m.group+' 组</b><br />'+_groupMax+'人一组，成果一起算分';
   }else{$('groupNone').classList.remove('hidden');$('groupGot').classList.add('hidden')}
   var rl=stateData.roll||{};
   var rcard=$('rollCard');

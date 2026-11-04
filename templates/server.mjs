@@ -297,7 +297,7 @@ function studentView(k){
     ok:true,
     room: ctxRoom(),
     me: s?{name:s.name,tail:s.tail,group:s.group,score:_groupsOn?groupScore:_personalScore,groupPerf:groupPerf,groupScore:groupScore,individualScore:_personalScore,hwScore:_hwScore,quizScore:_quizScore}:null,
-    groupsEnabled:_groupsOn,reviewEnabled:reviewOn(),hwCount:hwCountOn(),
+    groupsEnabled:_groupsOn,groupMax:Math.max(1,Math.min(10,Number(state.config&&state.config.groupMax)||3)),reviewEnabled:reviewOn(),hwCount:hwCountOn(),
     poll: poll.active?{active:true,question:poll.question,options:poll.options,voted,myVote:voted?poll.votes[k]:null,startedAt:poll.startedAt}:{active:false},
     hwOpen: !!(state.config&&state.config.hwOpen),
     workshopOpen: !!(state.config&&state.config.workshopOpen),

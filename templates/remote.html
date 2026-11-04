@@ -20,6 +20,11 @@ input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(
 .control-grid .btn{width:100%;padding:10px 6px;font-size:12.5px;line-height:1.35;white-space:normal;min-height:46px}
 .control-grid.cols-2{grid-template-columns:repeat(2,1fr)}
 .control-grid.cols-3{grid-template-columns:repeat(3,1fr)}
+#groupScores{display:flex;flex-direction:column;gap:6px}
+#groupScores .grow{display:flex;align-items:center;gap:8px;min-height:38px;padding:5px 0;border-bottom:1px solid #2A2A32;width:100%}
+#groupScores .gid{flex:0 0 28px}
+#groupScores .gname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#groupScores .btn{padding:5px 11px;font-size:12px}
 </style><link rel="stylesheet" href="/ui.css" />
 <link rel="stylesheet" href="/dialog.css" />
 </head><body>
@@ -115,7 +120,7 @@ function refresh(){api('/api/admin/state').then(function(d){
   if(d.groupsEnabled===false){
     document.getElementById('groupScores').innerHTML='<span class="muted">分组抽签已关闭 · 学员按个人计分</span>';
   }else{
-    var gs=(d.groups||[]).map(function(g){return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #2A2A32"><b style="width:26px">'+g.id+'</b><span style="flex:1">'+g.name+' · '+g.perf+'</span><button class="btn" data-g="'+g.id+'" data-d="-1">−1</button><button class="btn" data-g="'+g.id+'" data-d="+1</button></div>'}).join('');
+    var gs=(d.groups||[]).map(function(g){return '<div class="grow"><b class="gid">'+g.id+'</b><span class="gname">'+g.name+' · '+g.perf+'</span><button class="btn" data-g="'+g.id+'" data-d="-1">−1</button><button class="btn" data-g="'+g.id+'" data-d="1">+1</button></div>'}).join('');
     document.getElementById('groupScores').innerHTML=gs||'<span class="muted">还没有分组</span>';
   }
   var rl=d.roll||{};
