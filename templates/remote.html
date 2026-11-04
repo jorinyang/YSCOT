@@ -23,7 +23,7 @@ input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(
 </style><link rel="stylesheet" href="/ui.css" />
 <link rel="stylesheet" href="/dialog.css" />
 </head><body>
-<div class="top"><div class="brand">YSCOT · 遥控器</div><div class="links"><span class="pill" id="room">ROOM</span><a href="/screen" target="_blank">大屏</a><a href="/ops" target="_blank">后台</a></div></div>
+<div class="top"><div class="brand">YSCOT · 遥控器</div><div class="links"><span class="pill" id="room">ROOM</span><a id="screenLink" href="/screen" target="_blank">大屏</a><a id="adminLink" href="/ops" target="_blank">后台</a></div></div>
 
 <div class="card"><div class="k">课堂控制</div>
   <div class="control-grid cols-2">
@@ -89,6 +89,9 @@ input,textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(
 <script>
 var q=new URLSearchParams(location.search), ROOM=(q.get('room')||'').toUpperCase();
 document.getElementById('room').textContent=ROOM||'ROOM0';
+var _sl=document.getElementById('screenLink'),_al=document.getElementById('adminLink');
+if(_sl)_sl.href='/screen'+(ROOM?('?room='+encodeURIComponent(ROOM)):'');
+if(_al)_al.href='/ops'+(ROOM?('?room='+encodeURIComponent(ROOM)):'');
 function api(p,b){var u=p+(ROOM?((p.indexOf('?')>=0?'&':'?')+'room='+ROOM):'');return fetch(u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{cache:'no-store'}).then(function(r){return r.json()})}
 function post(p,b){return api(p,b)}
 function refresh(){api('/api/admin/state').then(function(d){
