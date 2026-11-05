@@ -57,6 +57,19 @@ body{background:#0E0E10;color:#F4F4F5;font-family:Inter,'PingFang SC','Microsoft
 .stat-card b{display:block;font-size:clamp(22px,2.8vw,42px);color:#CBF74E;line-height:1.1;font-variant-numeric:tabular-nums}
 .stat-card span{display:block;color:#A1A1AA;font-size:clamp(11px,1vw,14px);margin-top:4px}
 .data-list{display:flex;flex-direction:column;gap:1.2vh;max-width:1200px}
+/* 答题情况：头部统计固定、名单独立滚动、小组均分固定在底部 */
+.dataView.quiz-mode{overflow:hidden}
+.dataView.quiz-mode .data-body{align-items:stretch;overflow:hidden}
+.quiz-panel{height:100%;min-height:0;display:flex;flex-direction:column}
+.quiz-head{flex:0 0 auto}
+.quiz-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:14px;margin-right:-14px;scrollbar-width:thin;scrollbar-color:rgba(203,247,78,.55) rgba(255,255,255,.06)}
+.quiz-list::-webkit-scrollbar{width:8px}
+.quiz-list::-webkit-scrollbar-track{background:rgba(255,255,255,.05);border-radius:99px}
+.quiz-list::-webkit-scrollbar-thumb{background:rgba(203,247,78,.55);border-radius:99px}
+.quiz-list::-webkit-scrollbar-thumb:hover{background:rgba(203,247,78,.8)}
+.quiz-groups{flex:0 0 auto;max-height:30vh;overflow-y:auto;padding-right:14px;margin-right:-14px;scrollbar-width:thin;scrollbar-color:rgba(203,247,78,.35) rgba(255,255,255,.06)}
+.quiz-groups::-webkit-scrollbar{width:8px}
+.quiz-groups::-webkit-scrollbar-thumb{background:rgba(203,247,78,.35);border-radius:99px}
 .data-row{display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(244,244,245,.10);padding:1vh 0}
 .data-row .num{font-size:clamp(18px,2vw,30px);font-weight:900;color:#CBF74E;min-width:54px;font-variant-numeric:tabular-nums}
 .data-row .name{flex:1;font-size:clamp(13px,1.4vw,20px);color:#F4F4F5}
@@ -185,8 +198,9 @@ function quizPanel(d){
   var cards='<div class="stat-grid"><div class="stat-card"><b>'+q.answered+'</b><span>已答人数</span></div><div class="stat-card"><b>'+q.avg+'</b><span>平均分</span></div><div class="stat-card"><b>'+q.count+'</b><span>题目数</span></div><div class="stat-card"><b>'+q.points+'</b><span>满分</span></div></div>';
   var rows=(q.top||[]).map(function(s,i){return '<div class="data-row"><span class="num">'+(i+1)+'</span><span class="name">'+esc(s.name)+' <span class="tag">'+esc(s.tail||'')+'</span></span><span class="tag">'+(s.score||0)+' / '+(s.total||0)+'</span></div>'}).join('');
   var grows=(q.groups||[]).map(function(g){return '<div class="data-row"><span class="name">'+esc(g.name||g.id||'未分组')+'</span><span class="tag">'+g.members+' 人 · 已答 '+g.answered+'</span><span class="tag">均分 '+g.avg+'</span></div>'}).join('');
-  var groupBlock=grows?('<div class="data-sub" style="margin-top:2.2vh">按小组平均分</div><div class="data-list">'+grows+'</div>'):'';
-  return '<div class="data-kicker">YSCOT · 答题情况</div><div class="data-h1">在线答题</div><div class="data-sub">答题分数与排名</div>'+cards+'<div class="data-list">'+(rows||'<div class="data-note">还没有提交</div>')+'</div>'+groupBlock;
+  var groupBlock=grows?('<div class="quiz-groups"><div class="data-sub" style="margin:2.2vh 0 1vh">按小组平均分</div><div class="data-list">'+grows+'</div></div>'):'';
+  return '<div class="quiz-head"><div class="data-kicker">YSCOT · 答题情况</div><div class="data-h1">在线答题</div><div class="data-sub">答题分数与排名</div>'+cards+'</div>'+
+    '<div class="quiz-list data-list">'+(rows||'<div class="data-note">还没有提交</div>')+'</div>'+groupBlock;
 }
 var _dataSig='',_dataTab='';
 function dataSig(d,tab){
@@ -196,12 +210,12 @@ function showData(d){
   var dv=document.getElementById('dataView'),f=document.getElementById('viewFrame'),e=document.getElementById('empty');
   var tab=(d.screenDataTab||'base'); if(['base','poll','groups','homework','quiz'].indexOf(tab)<0)tab='base';
   var sig=dataSig(d,tab), changed=sig!==_dataSig, tabChanged=tab!==_dataTab;
-  dv.classList.add('show'); f.style.display='none'; e.classList.remove('show');
+  dv.classList.add('show'); dv.classList.toggle('quiz-mode',tab==='quiz'); f.style.display='none'; e.classList.remove('show');
   if(!changed) return;
   _dataSig=sig; _dataTab=tab;
   if(tabChanged) document.getElementById('dataTabs').innerHTML=tabButtons(tab);
   var body=tab==='base'?basePanel(d):tab==='poll'?pollPanel(d):tab==='groups'?groupsPanel(d):tab==='homework'?homeworkPanel(d):quizPanel(d);
-  document.getElementById('dataBody').innerHTML='<div class="data-panel'+(tabChanged?'':' no-anim')+'">'+body+'</div>';
+  document.getElementById('dataBody').innerHTML='<div class="data-panel'+(tab==='quiz'?' quiz-panel':'')+(tabChanged?'':' no-anim')+'">'+body+'</div>';
 }
 function hideData(){document.getElementById('dataView').classList.remove('show')}
 document.getElementById('dataTabs').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(!b)return;var t=b.getAttribute('data-tab');fetch('/api/screen/tab?room='+room,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tab:t})}).then(function(){refresh()}).catch(function(){})});
