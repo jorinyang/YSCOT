@@ -1011,7 +1011,7 @@ function screenView(){
     return {key:k,name:st.name||k,tail:st.tail||'',group:st.group||'',votes:st.votes||0,buzzes:st.buzzes||0,hwScore:Math.round(hw*10)/10,quizScore:qs,individualScore:Math.round((hw+qs)*10)/10};
   });
   const _indivTop=_students.slice().sort(function(a,b){return b.individualScore-a.individualScore||b.buzzes-a.buzzes}).slice(0,12);
-  const _quizTop=Object.keys(quiz.answers||{}).map(function(k){const a=quiz.answers[k]||{};const st=state.students[k]||{};return {name:st.name||k,tail:st.tail||'',score:a.score||0,total:a.total||0};}).sort(function(a,b){return b.score-a.score}).slice(0,12);
+  const _quizTop=Object.keys(quiz.answers||{}).map(function(k){const a=quiz.answers[k]||{};const st=state.students[k]||{};return {name:st.name||k,tail:st.tail||'',score:a.score||0,total:a.total||0};}).sort(function(a,b){return b.score-a.score});
   const _quizVals=Object.values(quiz.answers||{});
   return {ok:true,room:ctxRoom(),title:_meta.title||('课堂 '+ctxRoom()),at:Date.now(),groupsEnabled:groupsOn(),reviewEnabled:reviewOn(),hwCount:hwCountOn(),screenView:(cfg.screenView)||'data',screenDataTab:(function(){var t=String(cfg.screenDataTab||'base');return ['base','poll','groups','homework','quiz'].indexOf(t)>=0?t:'base'})(),slide:cfg.slide||0,packageId:_meta.packageId||'',materialOpen:!!cfg.materialOpen,hwOpen:!!cfg.hwOpen,workshopOpen:!!cfg.workshopOpen,
     meta:{title:_meta.title||('课堂 '+ctxRoom()),date:_meta.date||'',city:_meta.city||'',province:_meta.province||'',project:_meta.project||''},
