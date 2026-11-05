@@ -135,10 +135,10 @@ body{animation:pageIn .32s ease both}
     </div>
 
     <div class="card hidden" id="wsCard">
-      <div class="hw-head"><b>工作坊任务卡</b><span class="small">90 分钟 · 六关全做</span></div>
+      <div class="hw-head"><b id="wsHeadTitle">工作坊任务卡</b><span class="small" id="wsHeadMeta">90 分钟 · 六关全做</span></div>
       <div id="activeCard" style="margin-bottom:10px"></div>
       <div id="wsList"></div>
-      <p class="small" style="margin-top:6px">每关一张：先看「输入」给它什么，再看「动作」让它干什么，最后按「验收线」自查。</p>
+      <p class="small" id="wsHint" style="margin-top:6px">每关一张：先看「输入」给它什么，再看「动作」让它干什么，最后按「验收线」自查。</p>
     </div>
 
     <div class="card" id="hwCard" style="display:none">
@@ -433,10 +433,17 @@ function render(){
     $('buzzMsg').textContent=bz.winner?((bz.winner===me.name)?'你抢到了！':'已被 '+bz.winner+' 抢到'):(bz.running?'点按钮抢答':'等讲师开始');
   }
   var wso=!!(stateData&&stateData.workshopOpen);
+  var cd=stateData&&stateData.card;
   var ac=document.getElementById('activeCard');
-  if(ac){ var cd=stateData&&stateData.card; ac.innerHTML=cd?('<div style="border:1px solid rgba(203,247,78,.4);border-radius:12px;padding:10px 12px;background:rgba(203,247,78,.06)"><div class="small" style="color:#CBF74E">'+(cd.type||'行动卡')+'</div><b style="font-size:15px">'+cd.theme+'</b><div class="small" style="margin-top:6px;white-space:pre-wrap">'+(cd.content||'')+'</div>'+(cd.attrs?'<div class="small muted" style="margin-top:6px">'+cd.attrs+'</div>':'')+'</div>'):''; }
+  if(ac){ ac.innerHTML=cd?('<div style="border:1px solid rgba(203,247,78,.4);border-radius:12px;padding:10px 12px;background:rgba(203,247,78,.06)"><div class="small" style="color:#CBF74E">'+(cd.type||'行动卡')+'</div><b style="font-size:15px">'+cd.theme+'</b><div class="small" style="margin-top:6px;white-space:pre-wrap">'+(cd.content||'')+'</div>'+(cd.attrs?'<div class="small muted" style="margin-top:6px">'+cd.attrs+'</div>':'')+'</div>'):''; }
+  var hasCard=!!cd;
+  var wsh=document.getElementById('wsHeadTitle'), wsm=document.getElementById('wsHeadMeta'), wsn=document.getElementById('wsHint'), wsl=document.getElementById('wsList');
+  if(wsh)wsh.textContent=hasCard?'工作坊场景':'工作坊任务卡';
+  if(wsm)wsm.textContent=hasCard?'讲师已推送卡片':'90 分钟 · 六关全做';
+  if(wsn)wsn.style.display=hasCard?'none':'';
+  if(wsl)wsl.style.display=hasCard?'none':'';
   $('wsCard').classList.toggle('hidden',!wso);
-  if(wso) renderWs();
+  if(wso&&!hasCard) renderWs();
   var p=stateData.poll||{};
   if(p.active&&!p.voted){
     $('pollCard').classList.remove('hidden');
